@@ -8,9 +8,10 @@ export async function fetchStats(clientId: string) {
   return res.json();
 }
 
-export async function fetchLeads(params: { page?: number; search?: string; stage?: string; clientId: string }) {
+export async function fetchLeads(params: { page?: number; search?: string; stage?: string; clientId: string; limit?: number }) {
   const q = new URLSearchParams({
     page:     String(params.page || 1),
+    limit:    String(params.limit || 20),
     search:   params.search  || '',
     stage:    params.stage   || '',
     clientId: params.clientId,

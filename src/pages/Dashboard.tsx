@@ -4,6 +4,7 @@ import { fetchStats, fetchLeads, fetchAppointments } from '../lib/api';
 import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
 import Agenda from '../components/Agenda';
+import Followups from '../components/Followups';
 
 const STAGES = [
   { key: 'new_lead',        label: 'New Lead',       color: 'bg-gray-100 text-gray-700' },
@@ -17,7 +18,7 @@ const STAGES = [
 interface Props { clientId: string; businessName: string; }
 
 export default function Dashboard({ clientId, businessName }: Props) {
-  const [view, setView]               = useState<'pipeline' | 'list' | 'agenda'>('pipeline');
+  const [view, setView]               = useState<'pipeline' | 'list' | 'agenda' | 'followups'>('pipeline');
   const [stats, setStats]             = useState<any>(null);
   const [leads, setLeads]             = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -32,7 +33,7 @@ export default function Dashboard({ clientId, businessName }: Props) {
     setLoading(true);
     const [s, l, a] = await Promise.all([
       fetchStats(clientId),
-      fetchLeads({ clientId, page, search, stage: stageFilter }),
+      fetchLeads({ clientId, page, search, stage: stageFilter, limit: 200 }),
       fetchAppointments(clientId),
     ]);
     setStats(s);
@@ -85,16 +86,21 @@ export default function Dashboard({ clientId, businessName }: Props) {
         </div>
 
         {/* Nav tabs */}
-        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit">
-          {(['pipeline', 'list', 'agenda'] as const).map(v => (
+        <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit flex-wrap">
+          {([
+            { key: 'pipeline',  label: 'Pipeline' },
+            { key: 'list',      label: 'All Leads' },
+            { key: 'agenda',    label: 'Agenda' },
+            { key: 'followups', label: 'Follow-ups' },
+          ] as const).map(({ key, label }) => (
             <button
-              key={v}
-              onClick={() => setView(v)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition capitalize ${
-                view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
+              key={key}
+              onClick={() => setView(key)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+                view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {v === 'pipeline' ? 'Pipeline' : v === 'list' ? 'All Leads' : 'Agenda'}
+              {label}
             </button>
           ))}
         </div>
@@ -147,6 +153,11 @@ export default function Dashboard({ clientId, businessName }: Props) {
         {/* Agenda view */}
         {view === 'agenda' && (
           <Agenda appointments={appointments} />
+        )}
+
+        {/* Follow-ups view */}
+        {view === 'followups' && (
+          <Followups leads={leads} />
         )}
       </div>
 
