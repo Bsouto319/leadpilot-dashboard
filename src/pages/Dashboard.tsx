@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react';
 import { Users, Phone, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments } from '../lib/api';
 import LeadCard from '../components/LeadCard';
-import AppointmentRow from '../components/AppointmentRow';
 import Pipeline from '../components/Pipeline';
+import Agenda from '../components/Agenda';
 
 const STAGES = [
   { key: 'new_lead',        label: 'New Lead',       color: 'bg-gray-100 text-gray-700' },
@@ -146,19 +146,7 @@ export default function Dashboard({ clientId, businessName }: Props) {
 
         {/* Agenda view */}
         {view === 'agenda' && (
-          <div className="bg-white rounded-xl border border-gray-200">
-            <div className="p-4 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-900">Upcoming Appointments</h2>
-            </div>
-            <div className="divide-y divide-gray-50">
-              {appointments.map(apt => (
-                <AppointmentRow key={apt.id} appointment={apt} onClick={() => setSelectedLead(apt)} />
-              ))}
-              {!appointments.length && (
-                <p className="text-center text-gray-400 py-12 text-sm">No appointments scheduled.</p>
-              )}
-            </div>
-          </div>
+          <Agenda appointments={appointments} />
         )}
       </div>
 
