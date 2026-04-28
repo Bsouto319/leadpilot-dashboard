@@ -9,11 +9,11 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
   const byStage = (key: string) => leads.filter(l => l.stage === key);
 
   return (
-    <div className="flex gap-3 overflow-x-auto pb-2">
+    <div className="flex gap-3 overflow-x-auto pb-4 snap-x snap-mandatory scroll-smooth px-0.5">
       {stages.map(stage => {
         const items = byStage(stage.key);
         return (
-          <div key={stage.key} className="flex-shrink-0 w-56">
+          <div key={stage.key} className="flex-shrink-0 w-60 snap-start">
             <div className="flex items-center justify-between mb-2">
               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${stage.color}`}>{stage.label}</span>
               <span className="text-xs text-gray-400 font-medium">{items.length}</span>

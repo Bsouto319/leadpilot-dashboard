@@ -8,12 +8,12 @@ import Agenda from '../components/Agenda';
 import Followups from '../components/Followups';
 
 export const STAGES = [
-  { key: 'new_lead',         label: 'New Lead',        color: 'bg-gray-100 text-gray-700' },
-  { key: 'ai_responded',     label: 'Called',           color: 'bg-blue-100 text-blue-700' },
-  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-yellow-100 text-yellow-700' },
-  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-green-100 text-green-700' },
-  { key: 'completed',        label: 'Completed',        color: 'bg-purple-100 text-purple-700' },
-  { key: 'no_show',          label: 'No Show',          color: 'bg-red-100 text-red-700' },
+  { key: 'new_lead',         label: 'New Lead',        color: 'bg-slate-100 text-slate-500' },
+  { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-50 text-sky-600' },
+  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-50 text-amber-600' },
+  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-50 text-emerald-600' },
+  { key: 'completed',        label: 'Completed',        color: 'bg-violet-50 text-violet-600' },
+  { key: 'no_show',          label: 'No Show',          color: 'bg-rose-50 text-rose-500' },
 ];
 
 interface Props { clientId: string; businessName: string; }

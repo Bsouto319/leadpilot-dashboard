@@ -16,10 +16,10 @@ interface Props {
 }
 
 const STAGE_COLOR: Record<string, string> = {
-  scheduled:        'bg-green-100 text-green-700 border-green-200',
-  awaiting_address: 'bg-yellow-100 text-yellow-700 border-yellow-200',
-  completed:        'bg-purple-100 text-purple-700 border-purple-200',
-  no_show:          'bg-red-100 text-red-700 border-red-200',
+  scheduled:        'bg-emerald-50 text-emerald-600 border-emerald-200',
+  awaiting_address: 'bg-amber-50 text-amber-600 border-amber-200',
+  completed:        'bg-violet-50 text-violet-600 border-violet-200',
+  no_show:          'bg-rose-50 text-rose-500 border-rose-200',
 };
 
 const STAGE_LABEL: Record<string, string> = {
