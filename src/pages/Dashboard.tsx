@@ -1,21 +1,26 @@
-import { useEffect, useState } from 'react';
-import { Users, Phone, Calendar, TrendingUp, RefreshCw } from 'lucide-react';
-import { fetchStats, fetchLeads, fetchAppointments } from '../lib/api';
+import { useEffect, useState, useCallback } from 'react';
+import { Users, Phone, Calendar, TrendingUp, RefreshCw, Download, CheckCircle, XCircle, MessageSquare } from 'lucide-react';
+import { fetchStats, fetchLeads, fetchAppointments, updateLead, exportLeadsUrl } from '../lib/api';
+import { supabase } from '../lib/supabase';
 import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
 import Agenda from '../components/Agenda';
 import Followups from '../components/Followups';
 
-const STAGES = [
-  { key: 'new_lead',        label: 'New Lead',       color: 'bg-gray-100 text-gray-700' },
-  { key: 'ai_responded',    label: 'Called',          color: 'bg-blue-100 text-blue-700' },
-  { key: 'awaiting_address',label: 'Awaiting Address',color: 'bg-yellow-100 text-yellow-700' },
-  { key: 'scheduled',       label: 'Scheduled',       color: 'bg-green-100 text-green-700' },
-  { key: 'completed',       label: 'Completed',       color: 'bg-purple-100 text-purple-700' },
-  { key: 'no_show',         label: 'No Show',         color: 'bg-red-100 text-red-700' },
+export const STAGES = [
+  { key: 'new_lead',         label: 'New Lead',        color: 'bg-gray-100 text-gray-700' },
+  { key: 'ai_responded',     label: 'Called',           color: 'bg-blue-100 text-blue-700' },
+  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-yellow-100 text-yellow-700' },
+  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-green-100 text-green-700' },
+  { key: 'completed',        label: 'Completed',        color: 'bg-purple-100 text-purple-700' },
+  { key: 'no_show',          label: 'No Show',          color: 'bg-red-100 text-red-700' },
 ];
 
 interface Props { clientId: string; businessName: string; }
+
+function daysSince(d: string) {
+  return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
+}
 
 export default function Dashboard({ clientId, businessName }: Props) {
   const [view, setView]               = useState<'pipeline' | 'list' | 'agenda' | 'followups'>('pipeline');
@@ -28,12 +33,18 @@ export default function Dashboard({ clientId, businessName }: Props) {
   const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(true);
   const [selectedLead, setSelectedLead] = useState<any>(null);
+  const [toast, setToast]             = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
-  async function load() {
+  const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  }, []);
+
+  const load = useCallback(async () => {
     setLoading(true);
     const [s, l, a] = await Promise.all([
       fetchStats(clientId),
-      fetchLeads({ clientId, page, search, stage: stageFilter, limit: 200 }),
+      fetchLeads({ clientId, page, search, stage: stageFilter }),
       fetchAppointments(clientId),
     ]);
     setStats(s);
@@ -41,15 +52,55 @@ export default function Dashboard({ clientId, businessName }: Props) {
     setTotal(l.count || 0);
     setAppointments(a);
     setLoading(false);
+  }, [clientId, page, search, stageFilter]);
+
+  useEffect(() => { load(); }, [load]);
+
+  // Real-time: reload when any lead changes
+  useEffect(() => {
+    const channel = supabase
+      .channel('realtime-leads')
+      .on('postgres_changes', {
+        event: '*', schema: 'public', table: 'conversations',
+        filter: `client_id=eq.${clientId}`,
+      }, () => { load(); })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [clientId, load]);
+
+  async function handleStageChange(leadId: string, newStage: string) {
+    await updateLead(leadId, { stage: newStage });
+    showToast('Stage updated');
+    load();
+    if (selectedLead?.id === leadId) setSelectedLead((l: any) => ({ ...l, stage: newStage }));
   }
 
-  useEffect(() => { load(); }, [page, search, stageFilter]);
+  async function handleNotesSave(leadId: string, notes: string) {
+    await updateLead(leadId, { notes });
+    showToast('Notes saved');
+  }
+
+  const urgentCount = leads.filter(l =>
+    ['new_lead', 'ai_responded'].includes(l.stage) &&
+    daysSince(l.created_at) >= 2 && !l.followup_d3_sent_at
+  ).length;
+
+  const conversion = stats?.leadsWeek > 0
+    ? Math.round((stats.scheduled / stats.leadsWeek) * 100)
+    : 0;
 
   const kpis = [
-    { label: 'Leads Today',    value: stats?.leadsToday   ?? '–', icon: Users,       color: 'text-blue-600'   },
-    { label: 'Calls Today',    value: stats?.callsToday   ?? '–', icon: Phone,       color: 'text-green-600'  },
-    { label: 'Scheduled',      value: stats?.scheduled    ?? '–', icon: Calendar,    color: 'text-purple-600' },
-    { label: 'Response Rate',  value: stats ? `${stats.responseRate}%` : '–', icon: TrendingUp, color: 'text-orange-500' },
+    { label: 'Leads Today',   value: stats?.leadsToday  ?? '–', icon: Users,       color: 'text-blue-600'   },
+    { label: 'Calls Today',   value: stats?.callsToday  ?? '–', icon: Phone,       color: 'text-green-600'  },
+    { label: 'Scheduled',     value: stats?.scheduled   ?? '–', icon: Calendar,    color: 'text-purple-600' },
+    { label: 'Conversion',    value: stats ? `${conversion}%` : '–', icon: TrendingUp, color: 'text-orange-500' },
+  ];
+
+  const navTabs: { key: 'pipeline' | 'list' | 'agenda' | 'followups'; label: string; badge?: number }[] = [
+    { key: 'pipeline',  label: 'Pipeline' },
+    { key: 'list',      label: 'All Leads' },
+    { key: 'agenda',    label: 'Agenda' },
+    { key: 'followups', label: 'Follow-ups', badge: urgentCount },
   ];
 
   return (
@@ -65,10 +116,20 @@ export default function Dashboard({ clientId, businessName }: Props) {
             <p className="text-sm font-semibold text-gray-900">{businessName}</p>
           </div>
         </div>
-        <button onClick={load} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition">
-          <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-          Refresh
-        </button>
+        <div className="flex items-center gap-3">
+          <a
+            href={exportLeadsUrl(clientId)}
+            target="_blank"
+            rel="noreferrer"
+            className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition"
+          >
+            <Download size={14} /> Export
+          </a>
+          <button onClick={load} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition">
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            Refresh
+          </button>
+        </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
@@ -87,20 +148,20 @@ export default function Dashboard({ clientId, businessName }: Props) {
 
         {/* Nav tabs */}
         <div className="flex gap-1 bg-gray-100 p-1 rounded-lg w-fit flex-wrap">
-          {([
-            { key: 'pipeline',  label: 'Pipeline' },
-            { key: 'list',      label: 'All Leads' },
-            { key: 'agenda',    label: 'Agenda' },
-            { key: 'followups', label: 'Follow-ups' },
-          ] as const).map(({ key, label }) => (
+          {navTabs.map(({ key, label, badge }) => (
             <button
               key={key}
               onClick={() => setView(key)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${
+              className={`relative px-4 py-1.5 rounded-md text-sm font-medium transition ${
                 view === key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-900'
               }`}
             >
               {label}
+              {badge != null && badge > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {badge > 9 ? '9+' : badge}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -137,13 +198,13 @@ export default function Dashboard({ clientId, businessName }: Props) {
                 <p className="text-center text-gray-400 py-12 text-sm">No leads found.</p>
               )}
             </div>
-            {total > 20 && (
+            {total > 200 && (
               <div className="p-4 flex items-center justify-between border-t border-gray-100">
                 <p className="text-sm text-gray-500">{total} total leads</p>
                 <div className="flex gap-2">
                   <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">←</button>
                   <span className="px-3 py-1 text-sm text-gray-600">Page {page}</span>
-                  <button disabled={page * 20 >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">→</button>
+                  <button disabled={page * 200 >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">→</button>
                 </div>
               </div>
             )}
@@ -151,58 +212,152 @@ export default function Dashboard({ clientId, businessName }: Props) {
         )}
 
         {/* Agenda view */}
-        {view === 'agenda' && (
-          <Agenda appointments={appointments} />
-        )}
+        {view === 'agenda' && <Agenda appointments={appointments} />}
 
         {/* Follow-ups view */}
-        {view === 'followups' && (
-          <Followups leads={leads} />
-        )}
+        {view === 'followups' && <Followups leads={leads} />}
       </div>
 
       {/* Lead Detail Modal */}
       {selectedLead && (
-        <LeadModal lead={selectedLead} stages={STAGES} onClose={() => setSelectedLead(null)} />
+        <LeadModal
+          lead={selectedLead}
+          stages={STAGES}
+          onClose={() => setSelectedLead(null)}
+          onStageChange={handleStageChange}
+          onNotesSave={handleNotesSave}
+          showToast={showToast}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-medium text-white transition ${
+          toast.type === 'success' ? 'bg-green-600' : 'bg-red-600'
+        }`}>
+          {toast.type === 'success' ? <CheckCircle size={15} /> : <XCircle size={15} />}
+          {toast.msg}
+        </div>
       )}
     </div>
   );
 }
 
-function LeadModal({ lead, stages, onClose }: { lead: any; stages: any[]; onClose: () => void }) {
-  const stage = stages.find(s => s.key === lead.stage);
-  const phone = `+${lead.lead_phone}`;
+interface ModalProps {
+  lead: any;
+  stages: any[];
+  onClose: () => void;
+  onStageChange: (id: string, stage: string) => void;
+  onNotesSave: (id: string, notes: string) => void;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+}
+
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalProps) {
+  const [notes, setNotes] = useState(lead.notes || '');
+  const [saving, setSaving] = useState(false);
+  const [currentStage, setCurrentStage] = useState(lead.stage);
+  const stage = stages.find(s => s.key === currentStage);
+  const phone = lead.lead_phone;
+  const waLink = `https://wa.me/${phone}`;
+
+  async function changeStage(newStage: string) {
+    setSaving(true);
+    setCurrentStage(newStage);
+    await onStageChange(lead.id, newStage);
+    setSaving(false);
+  }
+
+  async function saveNotes() {
+    setSaving(true);
+    await onNotesSave(lead.id, notes);
+    setSaving(false);
+  }
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
         <div className="flex items-start justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">{lead.lead_name || 'Customer'}</h2>
             <span className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${stage?.color}`}>
-              {stage?.label || lead.stage}
+              {stage?.label || currentStage}
             </span>
           </div>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
         </div>
 
+        {/* Action buttons */}
+        <div className="flex gap-2">
+          <a href={`tel:+${phone}`} className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 px-3 py-2 rounded-lg transition">
+            <Phone size={13} /> Call
+          </a>
+          <a href={`sms:+${phone}`} className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-green-700 bg-green-100 hover:bg-green-200 px-3 py-2 rounded-lg transition">
+            <MessageSquare size={13} /> SMS
+          </a>
+          <a href={waLink} target="_blank" rel="noreferrer" className="flex-1 flex items-center justify-center gap-1.5 text-sm font-medium text-emerald-700 bg-emerald-100 hover:bg-emerald-200 px-3 py-2 rounded-lg transition">
+            <svg viewBox="0 0 24 24" className="w-3.5 h-3.5 fill-current" xmlns="http://www.w3.org/2000/svg"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+            WhatsApp
+          </a>
+        </div>
+
+        {/* Info */}
         <div className="space-y-2 text-sm">
-          <Row label="Phone">
-            <a href={`tel:${phone}`} className="text-blue-600 font-medium hover:underline">{phone}</a>
-            <span className="text-gray-400 mx-1">·</span>
-            <a href={`sms:${phone}`} className="text-green-600 font-medium hover:underline">Send SMS</a>
-          </Row>
-          {lead.lead_address && <Row label="Address"><span>{lead.lead_address}</span></Row>}
+          <Row label="Phone"><span className="font-medium">+{phone}</span></Row>
+          {lead.lead_address  && <Row label="Address"><span>{lead.lead_address}</span></Row>}
           {lead.service_type  && <Row label="Service"><span className="capitalize">{lead.service_type.replace(/_/g, ' ')}</span></Row>}
           {lead.scheduled_at  && <Row label="Scheduled"><span>{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
           {lead.source        && <Row label="Source"><span className="capitalize">{lead.source}</span></Row>}
           <Row label="Received"><span>{new Date(lead.created_at).toLocaleString('en-US')}</span></Row>
-          {lead.email_body    && (
-            <div className="mt-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">First Message</p>
-              <p className="bg-gray-50 rounded-lg px-3 py-2 text-gray-700 text-sm">{lead.email_body}</p>
-            </div>
-          )}
+        </div>
+
+        {/* First message */}
+        {lead.email_body && (
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">First Message</p>
+            <p className="bg-gray-50 rounded-lg px-3 py-2 text-gray-700 text-sm">{lead.email_body}</p>
+          </div>
+        )}
+
+        {/* Change stage */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Move to Stage</p>
+          <div className="flex flex-wrap gap-1.5">
+            {stages.map(s => (
+              <button
+                key={s.key}
+                disabled={saving || s.key === currentStage}
+                onClick={() => changeStage(s.key)}
+                className={`text-xs px-2.5 py-1 rounded-full font-medium transition border ${
+                  s.key === currentStage
+                    ? `${s.color} border-transparent opacity-60 cursor-default`
+                    : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400'
+                }`}
+              >
+                {s.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Notes */}
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Notes</p>
+          <textarea
+            value={notes}
+            onChange={e => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Add notes about this lead…"
+            className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+          />
+          <button
+            onClick={saveNotes}
+            disabled={saving}
+            className="mt-1.5 text-xs px-3 py-1.5 bg-gray-900 text-white rounded-lg hover:bg-gray-700 transition disabled:opacity-40"
+          >
+            Save notes
+          </button>
         </div>
       </div>
     </div>
@@ -217,3 +372,4 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     </div>
   );
 }
+
