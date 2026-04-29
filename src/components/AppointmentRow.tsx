@@ -28,13 +28,6 @@ export default function AppointmentRow({ appointment: apt, onClick }: Props) {
         >
           +{apt.lead_phone}
         </a>
-        <a
-          href={`sms:+${apt.lead_phone}`}
-          onClick={e => e.stopPropagation()}
-          className="text-xs text-green-600 hover:underline"
-        >
-          Send SMS
-        </a>
       </div>
     </button>
   );

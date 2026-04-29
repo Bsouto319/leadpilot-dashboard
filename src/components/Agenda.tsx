@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageSquare, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MapPin } from 'lucide-react';
 
 interface Appointment {
   id: string;
@@ -161,20 +161,12 @@ export default function Agenda({ appointments }: Props) {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <a
-                      href={`tel:+${apt.lead_phone}`}
-                      className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition"
-                    >
-                      <Phone size={11} /> Call
-                    </a>
-                    <a
-                      href={`sms:+${apt.lead_phone}`}
-                      className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 px-2.5 py-1.5 rounded-lg transition"
-                    >
-                      <MessageSquare size={11} /> SMS
-                    </a>
-                  </div>
+                  <a
+                    href={`tel:+${apt.lead_phone}`}
+                    className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition shrink-0"
+                  >
+                    <Phone size={11} /> Call
+                  </a>
                 </div>
               );
             })}

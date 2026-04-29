@@ -1,4 +1,4 @@
-import { Phone, MessageSquare, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Phone, Clock, AlertCircle, CheckCircle } from 'lucide-react';
 
 interface Lead {
   id: string;
@@ -152,20 +152,12 @@ function LeadRow({ lead }: { lead: Lead }) {
           <p className="text-xs text-gray-400 mt-1 italic truncate max-w-sm">"{lead.email_body}"</p>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <a
-          href={`tel:+${lead.lead_phone}`}
-          className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition"
-        >
-          <Phone size={11} /> Call
-        </a>
-        <a
-          href={`sms:+${lead.lead_phone}`}
-          className="flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 hover:bg-green-200 px-2.5 py-1.5 rounded-lg transition"
-        >
-          <MessageSquare size={11} /> SMS
-        </a>
-      </div>
+      <a
+        href={`tel:+${lead.lead_phone}`}
+        className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition shrink-0"
+      >
+        <Phone size={11} /> Call
+      </a>
     </div>
   );
 }
