@@ -6,6 +6,7 @@ import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
 import Agenda from '../components/Agenda';
 import Followups from '../components/Followups';
+import Dialpad from '../components/Dialpad';
 
 export const STAGES = [
   { key: 'new_lead',         label: 'New Lead',        color: 'bg-slate-100 text-slate-500' },
@@ -23,7 +24,7 @@ function daysSince(d: string) {
 }
 
 export default function Dashboard({ clientId, businessName }: Props) {
-  const [view, setView]               = useState<'pipeline' | 'list' | 'agenda' | 'followups'>('pipeline');
+  const [view, setView]               = useState<'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad'>('pipeline');
   const [stats, setStats]             = useState<any>(null);
   const [leads, setLeads]             = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -96,11 +97,12 @@ export default function Dashboard({ clientId, businessName }: Props) {
     { label: 'Conversion',    value: stats ? `${conversion}%` : '–', icon: TrendingUp, color: 'text-orange-500' },
   ];
 
-  const navTabs: { key: 'pipeline' | 'list' | 'agenda' | 'followups'; label: string; badge?: number }[] = [
+  const navTabs: { key: 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad'; label: string; badge?: number }[] = [
     { key: 'pipeline',  label: 'Pipeline' },
     { key: 'list',      label: 'All Leads' },
     { key: 'agenda',    label: 'Agenda' },
     { key: 'followups', label: 'Follow-ups', badge: urgentCount },
+    { key: 'dialpad',   label: '📞 Ligar' },
   ];
 
   return (
@@ -216,6 +218,9 @@ export default function Dashboard({ clientId, businessName }: Props) {
 
         {/* Follow-ups view */}
         {view === 'followups' && <Followups leads={leads} />}
+
+        {/* Dialpad view */}
+        {view === 'dialpad' && <Dialpad />}
       </div>
 
       {/* Lead Detail Modal */}
