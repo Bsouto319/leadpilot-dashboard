@@ -45,10 +45,10 @@ export default function Dialpad() {
   }
 
   function normalizePhone(raw: string): string | null {
-    const s = raw.replace(/[\s\-\(\)\.]/g, '');
-    if (/^\+\d{7,15}$/.test(s)) return s;
-    if (/^\d{10}$/.test(s)) return `+1${s}`;
-    if (/^\d{11}$/.test(s) && s[0] === '1') return `+${s}`;
+    const s = raw.replace(/[\s\-\(\)\+\.]/g, '');
+    if (/^\d{10}$/.test(s)) return `+1${s}`;                // US sem código
+    if (/^\d{11}$/.test(s) && s[0] === '1') return `+${s}`; // US com 1
+    if (/^\d{7,15}$/.test(s)) return `+${s}`;               // qualquer internacional (BR, etc.)
     return null;
   }
 
