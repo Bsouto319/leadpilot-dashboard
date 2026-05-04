@@ -1,6 +1,5 @@
-import twilio from 'twilio';
-
-export default function handler(req, res) {
+// Proxy para o backend que já tem todas as credenciais Twilio configuradas
+export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const key = req.headers['x-admin-key'];
@@ -8,26 +7,17 @@ export default function handler(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken  = process.env.TWILIO_AUTH_TOKEN;
-  const appSid     = process.env.TWILIO_TWIML_APP_SID;
-  const fromNumber = process.env.TWILIO_FROM_NUMBER || '+19418456110';
+  const backendUrl = process.env.BACKEND_URL || 'http://asso488k40o4gsc8c0w80gcw.31.97.240.160.sslip.io';
 
-  if (!appSid)     return res.status(500).json({ error: 'TWILIO_TWIML_APP_SID não configurado no Vercel' });
-  if (!accountSid) return res.status(500).json({ error: 'TWILIO_ACCOUNT_SID não configurado' });
-
-  const apiKeySid    = process.env.TWILIO_API_KEY;
-  const apiKeySecret = process.env.TWILIO_API_SECRET;
-  if (!apiKeySid || !apiKeySecret) {
-    return res.status(500).json({ error: 'TWILIO_API_KEY ou TWILIO_API_SECRET não configurado' });
+  try {
+    const response = await fetch(`${backendUrl}/api/admin/voice-token`, {
+      method: 'POST',
+      headers: { 'x-admin-key': key },
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json(data);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ error: 'Backend indisponível: ' + err.message });
   }
-
-  const { AccessToken } = twilio.jwt;
-  const { VoiceGrant }  = AccessToken;
-
-  const voiceGrant = new VoiceGrant({ outgoingApplicationSid: appSid, incomingAllow: false });
-  const token = new AccessToken(accountSid, apiKeySid, apiKeySecret, { identity: 'admin', ttl: 3600 });
-  token.addGrant(voiceGrant);
-
-  res.json({ token: token.toJwt(), fromNumber });
 }
