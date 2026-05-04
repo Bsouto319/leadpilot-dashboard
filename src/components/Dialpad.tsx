@@ -277,7 +277,7 @@ export default function Dialpad() {
             className="px-4 py-3.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 active:bg-gray-100 transition touch-manipulation"
             title="Reconectar"
           >
-            <RefreshCw size={16} className={status === 'loading' ? 'animate-spin' : ''} />
+            <RefreshCw size={16} />
           </button>
         )}
       </div>
