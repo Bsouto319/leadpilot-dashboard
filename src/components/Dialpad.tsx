@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight, Wifi } from 'lucide-react';
 import { Device, Call } from '@twilio/voice-sdk';
 
-type Status = 'loading' | 'idle' | 'ringing' | 'active' | 'error';
+type Status = 'disconnected' | 'loading' | 'idle' | 'ringing' | 'active' | 'error';
 
 export default function Dialpad() {
-  const [status, setStatus]             = useState<Status>('loading');
+  const [status, setStatus]             = useState<Status>('disconnected');
   const [errorMsg, setErrorMsg]         = useState('');
   const [phoneInput, setPhoneInput]     = useState('');
   const [fromNumber, setFromNumber]     = useState('+19418456110');
@@ -17,7 +17,6 @@ export default function Dialpad() {
   const callRef   = useRef<Call | null>(null);
 
   useEffect(() => {
-    initDevice();
     loadClient();
     return () => { deviceRef.current?.destroy(); };
   }, []);
@@ -36,6 +35,7 @@ export default function Dialpad() {
     } catch {}
   }
 
+  // Precisa de interação do usuário antes de inicializar (iOS Safari exige isso para microfone)
   async function initDevice() {
     setStatus('loading');
     setErrorMsg('');
@@ -123,7 +123,7 @@ export default function Dialpad() {
     const to = normalizePhone(phoneInput);
     if (!to) {
       setStatus('error');
-      setErrorMsg('Número inválido. Use: +15551234567 ou +5561999990000');
+      setErrorMsg('Número inválido. Ex: (555) 789-1234 ou +5561999990000');
       return;
     }
     setStatus('ringing');
@@ -148,44 +148,69 @@ export default function Dialpad() {
 
   const busy = status === 'ringing' || status === 'active';
 
+  // ── TELA: não conectado ainda ──
+  if (status === 'disconnected') {
+    return (
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm max-w-sm p-6 space-y-4">
+        <div>
+          <h3 className="text-base font-bold text-gray-900">Softphone</h3>
+          <p className="text-sm text-gray-400 mt-0.5">Saindo de: {fromNumber}</p>
+        </div>
+        <div className="bg-slate-50 rounded-xl p-4 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center mx-auto">
+            <Wifi size={22} className="text-blue-500" />
+          </div>
+          <p className="text-sm text-gray-600">Toque para ativar o softphone.<br/>O browser vai pedir acesso ao microfone.</p>
+          <button
+            onClick={initDevice}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-semibold rounded-xl transition shadow-md shadow-blue-500/25 touch-manipulation"
+          >
+            <Phone size={16} /> Conectar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   const statusConfig: Record<Status, { label: string; cls: string }> = {
-    loading: { label: 'Conectando ao Twilio...', cls: 'bg-blue-50 text-blue-500' },
-    idle:    { label: 'Pronto para ligar',       cls: 'bg-gray-50 text-gray-400' },
-    ringing: { label: 'Ligando...',              cls: 'bg-amber-50 text-amber-600' },
-    active:  { label: 'Em ligação',              cls: 'bg-green-50 text-green-600' },
-    error:   { label: errorMsg || 'Erro',        cls: 'bg-red-50 text-red-500' },
+    disconnected: { label: '', cls: '' },
+    loading:  { label: 'Conectando…',      cls: 'bg-blue-50 text-blue-500' },
+    idle:     { label: 'Pronto para ligar', cls: 'bg-gray-50 text-gray-400' },
+    ringing:  { label: 'Ligando…',         cls: 'bg-amber-50 text-amber-600' },
+    active:   { label: 'Em ligação',       cls: 'bg-green-50 text-green-600' },
+    error:    { label: errorMsg || 'Erro', cls: 'bg-red-50 text-red-500' },
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 max-w-sm p-6 space-y-5">
+    <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm max-w-sm p-5 space-y-4">
 
       {/* Banner de ligação recebida */}
       {incomingCall && (
-        <div className="bg-green-50 border border-green-300 rounded-lg p-4 space-y-3 animate-pulse-border">
-          <div className="flex items-center gap-2 text-green-700 font-semibold">
+        <div className="bg-green-50 border border-green-300 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 text-green-700 font-bold">
             <PhoneIncoming size={16} className="animate-bounce" />
             <span>Lead Ligando</span>
           </div>
-          <p className="text-sm text-green-700 font-mono">{callerNumber}</p>
-          <div className="flex gap-2">
+          <p className="text-sm text-green-700 font-mono font-semibold">{callerNumber}</p>
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={acceptCall}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition"
+              className="flex items-center justify-center gap-2 py-3 bg-green-600 active:bg-green-700 text-white text-sm font-bold rounded-xl transition touch-manipulation"
             >
-              <Phone size={14} /> Atender
+              <Phone size={15} /> Atender
             </button>
             <button
               onClick={rejectCall}
-              className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition"
+              className="flex items-center justify-center gap-2 py-3 bg-red-600 active:bg-red-700 text-white text-sm font-bold rounded-xl transition touch-manipulation"
             >
-              <PhoneOff size={14} /> Rejeitar
+              <PhoneOff size={15} /> Rejeitar
             </button>
           </div>
         </div>
       )}
 
       <div>
-        <h3 className="text-base font-semibold text-gray-900">Ligar para Lead</h3>
+        <h3 className="text-base font-bold text-gray-900">Softphone</h3>
         <p className="text-xs text-gray-400 mt-0.5">Saindo de: {fromNumber}</p>
       </div>
 
@@ -193,72 +218,74 @@ export default function Dialpad() {
       <button
         onClick={toggleManualMode}
         disabled={!clientId}
-        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition ${
+        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border transition touch-manipulation ${
           manualMode
             ? 'border-blue-300 bg-blue-50 text-blue-700'
             : 'border-gray-200 bg-gray-50 text-gray-500'
         } disabled:opacity-40`}
       >
         <div className="text-left">
-          <p className="text-sm font-medium">
-            {manualMode ? '📞 Atender manualmente: ON' : '🤖 IA atende ligações: ON'}
+          <p className="text-sm font-semibold">
+            {manualMode ? '📞 Atender manualmente: ON' : '🤖 IA atende: ON'}
           </p>
           <p className="text-xs opacity-60 mt-0.5">
-            {manualMode
-              ? 'Ligações tocam aqui — IA assume em 20s se não atender'
-              : 'Ative para atender leads pessoalmente'}
+            {manualMode ? 'Ligações tocam aqui · IA assume em 20s' : 'Ative para atender pessoalmente'}
           </p>
         </div>
         {manualMode
-          ? <ToggleRight size={22} className="text-blue-600 shrink-0 ml-2" />
-          : <ToggleLeft  size={22} className="text-gray-400 shrink-0 ml-2" />
+          ? <ToggleRight size={24} className="text-blue-600 shrink-0 ml-2" />
+          : <ToggleLeft  size={24} className="text-gray-400 shrink-0 ml-2" />
         }
       </button>
 
+      {/* Input de número */}
       <div>
-        <label className="block text-xs font-medium text-gray-500 mb-1.5">Número do Lead</label>
+        <label className="block text-xs font-semibold text-gray-500 mb-1.5 uppercase tracking-wide">Número do Lead</label>
         <input
           type="tel"
           value={phoneInput}
           onChange={e => setPhoneInput(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && !busy && dial()}
-          placeholder="+15557891234 ou +5561999990000"
+          placeholder="+1 (555) 789-1234"
           disabled={busy}
-          className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+          inputMode="tel"
+          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-base focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100 touch-manipulation"
         />
       </div>
 
+      {/* Botões de ação */}
       <div className="flex gap-2">
         {!busy ? (
           <button
             onClick={dial}
             disabled={status === 'loading' || status === 'error'}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-40"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-green-500 to-green-600 active:from-green-600 active:to-green-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-green-500/25 disabled:opacity-40 touch-manipulation"
           >
-            <Phone size={15} /> Ligar
+            <Phone size={16} /> Ligar
           </button>
         ) : (
           <button
             onClick={hangup}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-red-600 active:bg-red-700 text-white text-sm font-bold rounded-xl transition touch-manipulation"
           >
-            <PhoneOff size={15} /> {status === 'ringing' ? 'Cancelar' : 'Desligar'}
+            <PhoneOff size={16} /> {status === 'ringing' ? 'Cancelar' : 'Desligar'}
           </button>
         )}
-        {status === 'error' && (
+        {(status === 'error' || status === 'idle') && (
           <button
             onClick={initDevice}
-            className="px-3 py-2.5 border border-gray-200 rounded-lg text-gray-500 hover:bg-gray-50 transition"
+            className="px-4 py-3.5 border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 active:bg-gray-100 transition touch-manipulation"
             title="Reconectar"
           >
-            <RefreshCw size={15} />
+            <RefreshCw size={16} className={status === 'loading' ? 'animate-spin' : ''} />
           </button>
         )}
       </div>
 
-      <div className={`flex items-center gap-2 text-sm px-3 py-2 rounded-lg ${statusConfig[status].cls}`}>
+      {/* Status bar */}
+      <div className={`flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl ${statusConfig[status].cls}`}>
         <PhoneCall size={14} className={status === 'active' ? 'animate-pulse' : ''} />
-        <span className="truncate">{statusConfig[status].label}</span>
+        <span className="truncate font-medium">{statusConfig[status].label}</span>
       </div>
     </div>
   );

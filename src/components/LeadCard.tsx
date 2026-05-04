@@ -9,7 +9,7 @@ export default function LeadCard({ lead, stages, onClick }: Props) {
   const isNew = minutesSince(lead.created_at) < 60;
 
   return (
-    <div className="px-4 py-3.5 hover:bg-blue-50/50 transition flex items-center gap-3 group">
+    <div className="px-4 py-3.5 hover:bg-blue-50/40 active:bg-blue-50/60 transition flex items-center gap-3">
       <button onClick={onClick} className="flex items-center gap-3 flex-1 min-w-0 text-left">
         {/* Avatar */}
         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-500 flex items-center justify-center shrink-0 shadow-sm relative">
@@ -31,7 +31,6 @@ export default function LeadCard({ lead, stages, onClick }: Props) {
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <p className="text-xs text-gray-400 font-medium">+{lead.lead_phone}</p>
             {lead.service_type && <p className="text-xs text-blue-600 font-medium capitalize">{lead.service_type.replace(/_/g, ' ')}</p>}
-            {lead.lead_address && <p className="text-xs text-gray-400 truncate">📍 {lead.lead_address}</p>}
           </div>
         </div>
 
@@ -40,12 +39,15 @@ export default function LeadCard({ lead, stages, onClick }: Props) {
         </p>
       </button>
 
+      {/* Call button — sempre visível (não depende de hover) */}
       <a
         href={`tel:+${lead.lead_phone}`}
-        className="p-2 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-500 hover:text-white transition shrink-0 opacity-0 group-hover:opacity-100"
+        className="p-2.5 rounded-xl bg-blue-600 text-white active:bg-blue-700 transition shrink-0 touch-manipulation"
         title="Call"
       >
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8 19.79 19.79 0 01.22 1.22 2 2 0 012.22 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/></svg>
+        <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.8 19.79 19.79 0 01.22 1.22 2 2 0 012.22 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L6.91 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+        </svg>
       </a>
     </div>
   );

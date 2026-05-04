@@ -28,7 +28,7 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                   <button
                     key={lead.id}
                     onClick={() => onSelect(lead)}
-                    className="w-full text-left bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm hover:shadow-md hover:border-blue-200 hover:-translate-y-0.5 transition-all duration-150 p-3.5 group"
+                    className="w-full text-left bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm active:shadow-md active:border-blue-200 hover:shadow-md hover:border-blue-200 transition-all duration-150 p-3.5 group"
                   >
                     {/* Name row */}
                     <div className="flex items-start justify-between gap-1 mb-2">
