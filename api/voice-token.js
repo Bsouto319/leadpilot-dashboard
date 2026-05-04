@@ -16,11 +16,17 @@ export default function handler(req, res) {
   if (!appSid)     return res.status(500).json({ error: 'TWILIO_TWIML_APP_SID não configurado no Vercel' });
   if (!accountSid) return res.status(500).json({ error: 'TWILIO_ACCOUNT_SID não configurado' });
 
+  const apiKeySid    = process.env.TWILIO_API_KEY;
+  const apiKeySecret = process.env.TWILIO_API_SECRET;
+  if (!apiKeySid || !apiKeySecret) {
+    return res.status(500).json({ error: 'TWILIO_API_KEY ou TWILIO_API_SECRET não configurado' });
+  }
+
   const { AccessToken } = twilio.jwt;
   const { VoiceGrant }  = AccessToken;
 
   const voiceGrant = new VoiceGrant({ outgoingApplicationSid: appSid, incomingAllow: false });
-  const token = new AccessToken(accountSid, accountSid, authToken, { identity: 'admin', ttl: 3600 });
+  const token = new AccessToken(accountSid, apiKeySid, apiKeySecret, { identity: 'admin', ttl: 3600 });
   token.addGrant(voiceGrant);
 
   res.json({ token: token.toJwt(), fromNumber });
