@@ -1,21 +1,40 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, PhoneCall, RefreshCw } from 'lucide-react';
+import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight } from 'lucide-react';
 import { Device, Call } from '@twilio/voice-sdk';
 
 type Status = 'loading' | 'idle' | 'ringing' | 'active' | 'error';
 
 export default function Dialpad() {
-  const [status, setStatus]     = useState<Status>('loading');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [phoneInput, setPhoneInput] = useState('');
-  const [fromNumber, setFromNumber] = useState('+19418456110');
+  const [status, setStatus]             = useState<Status>('loading');
+  const [errorMsg, setErrorMsg]         = useState('');
+  const [phoneInput, setPhoneInput]     = useState('');
+  const [fromNumber, setFromNumber]     = useState('+19418456110');
+  const [manualMode, setManualMode]     = useState(false);
+  const [clientId, setClientId]         = useState<string | null>(null);
+  const [incomingCall, setIncomingCall] = useState<Call | null>(null);
+  const [callerNumber, setCallerNumber] = useState('');
   const deviceRef = useRef<Device | null>(null);
   const callRef   = useRef<Call | null>(null);
 
   useEffect(() => {
     initDevice();
+    loadClient();
     return () => { deviceRef.current?.destroy(); };
   }, []);
+
+  async function loadClient() {
+    try {
+      const resp = await fetch('/api/clients', {
+        headers: { 'x-admin-key': import.meta.env.VITE_ADMIN_KEY || '' },
+      });
+      if (!resp.ok) return;
+      const clients = await resp.json();
+      if (Array.isArray(clients) && clients.length > 0) {
+        setClientId(clients[0].id);
+        setManualMode(!!clients[0].manual_mode);
+      }
+    } catch {}
+  }
 
   async function initDevice() {
     setStatus('loading');
@@ -32,11 +51,22 @@ export default function Dialpad() {
 
       deviceRef.current?.destroy();
       const device = new Device(data.token, { logLevel: 1 });
+
       device.on('error', (err: Error) => {
         setStatus('error');
         setErrorMsg(err.message);
       });
+
+      device.on('incoming', (call: Call) => {
+        const caller = call.parameters.From || 'Número desconhecido';
+        setCallerNumber(caller);
+        setIncomingCall(call);
+        call.on('disconnect', () => { setIncomingCall(null); setCallerNumber(''); setStatus('idle'); });
+        call.on('cancel',     () => { setIncomingCall(null); setCallerNumber(''); });
+      });
+
       deviceRef.current = device;
+      await device.register();
       setStatus('idle');
     } catch (err: any) {
       setStatus('error');
@@ -44,11 +74,47 @@ export default function Dialpad() {
     }
   }
 
+  function acceptCall() {
+    if (!incomingCall) return;
+    incomingCall.accept();
+    callRef.current = incomingCall;
+    setIncomingCall(null);
+    setStatus('active');
+    incomingCall.on('disconnect', () => { callRef.current = null; setStatus('idle'); });
+    incomingCall.on('error', (err: Error) => { callRef.current = null; setStatus('error'); setErrorMsg(err.message); });
+  }
+
+  function rejectCall() {
+    if (!incomingCall) return;
+    incomingCall.reject();
+    setIncomingCall(null);
+    setCallerNumber('');
+  }
+
+  async function toggleManualMode() {
+    if (!clientId) return;
+    const newMode = !manualMode;
+    setManualMode(newMode);
+    try {
+      const r = await fetch('/api/clients', {
+        method: 'PATCH',
+        headers: {
+          'x-admin-key': import.meta.env.VITE_ADMIN_KEY || '',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id: clientId, manual_mode: newMode }),
+      });
+      if (!r.ok) setManualMode(!newMode);
+    } catch {
+      setManualMode(!newMode);
+    }
+  }
+
   function normalizePhone(raw: string): string | null {
     const s = raw.replace(/[\s\-\(\)\+\.]/g, '');
-    if (/^\d{10}$/.test(s)) return `+1${s}`;                // US sem código
-    if (/^\d{11}$/.test(s) && s[0] === '1') return `+${s}`; // US com 1
-    if (/^\d{7,15}$/.test(s)) return `+${s}`;               // qualquer internacional (BR, etc.)
+    if (/^\d{10}$/.test(s)) return `+1${s}`;
+    if (/^\d{11}$/.test(s) && s[0] === '1') return `+${s}`;
+    if (/^\d{7,15}$/.test(s)) return `+${s}`;
     return null;
   }
 
@@ -64,13 +130,9 @@ export default function Dialpad() {
     try {
       const call = await deviceRef.current.connect({ params: { To: to } });
       callRef.current = call;
-      call.on('accept', () => setStatus('active'));
+      call.on('accept',     () => setStatus('active'));
       call.on('disconnect', () => { callRef.current = null; setStatus('idle'); });
-      call.on('error', (err: Error) => {
-        callRef.current = null;
-        setStatus('error');
-        setErrorMsg(err.message);
-      });
+      call.on('error',      (err: Error) => { callRef.current = null; setStatus('error'); setErrorMsg(err.message); });
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.message);
@@ -96,10 +158,62 @@ export default function Dialpad() {
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 max-w-sm p-6 space-y-5">
+
+      {/* Banner de ligação recebida */}
+      {incomingCall && (
+        <div className="bg-green-50 border border-green-300 rounded-lg p-4 space-y-3 animate-pulse-border">
+          <div className="flex items-center gap-2 text-green-700 font-semibold">
+            <PhoneIncoming size={16} className="animate-bounce" />
+            <span>Lead Ligando</span>
+          </div>
+          <p className="text-sm text-green-700 font-mono">{callerNumber}</p>
+          <div className="flex gap-2">
+            <button
+              onClick={acceptCall}
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <Phone size={14} /> Atender
+            </button>
+            <button
+              onClick={rejectCall}
+              className="flex-1 flex items-center justify-center gap-2 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <PhoneOff size={14} /> Rejeitar
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <h3 className="text-base font-semibold text-gray-900">Ligar para Lead</h3>
         <p className="text-xs text-gray-400 mt-0.5">Saindo de: {fromNumber}</p>
       </div>
+
+      {/* Toggle modo manual */}
+      <button
+        onClick={toggleManualMode}
+        disabled={!clientId}
+        className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg border transition ${
+          manualMode
+            ? 'border-blue-300 bg-blue-50 text-blue-700'
+            : 'border-gray-200 bg-gray-50 text-gray-500'
+        } disabled:opacity-40`}
+      >
+        <div className="text-left">
+          <p className="text-sm font-medium">
+            {manualMode ? '📞 Atender manualmente: ON' : '🤖 IA atende ligações: ON'}
+          </p>
+          <p className="text-xs opacity-60 mt-0.5">
+            {manualMode
+              ? 'Ligações tocam aqui — IA assume em 20s se não atender'
+              : 'Ative para atender leads pessoalmente'}
+          </p>
+        </div>
+        {manualMode
+          ? <ToggleRight size={22} className="text-blue-600 shrink-0 ml-2" />
+          : <ToggleLeft  size={22} className="text-gray-400 shrink-0 ml-2" />
+        }
+      </button>
 
       <div>
         <label className="block text-xs font-medium text-gray-500 mb-1.5">Número do Lead</label>
