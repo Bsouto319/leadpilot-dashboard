@@ -1,5 +1,10 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Users, Phone, Calendar, TrendingUp, RefreshCw, Download, CheckCircle, XCircle, MessageSquare, PhoneCall, LayoutGrid, List, Clock, Zap } from 'lucide-react';
+import {
+  Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
+  CheckCircle, XCircle, MessageSquare, PhoneCall,
+  LayoutGrid, List, Clock, Zap, Settings, LogOut, ArrowLeft,
+  KeyRound, HeadphonesIcon,
+} from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, exportLeadsUrl } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import LeadCard from '../components/LeadCard';
@@ -17,24 +22,29 @@ export const STAGES = [
   { key: 'no_show',          label: 'No Show',          color: 'bg-rose-100 text-rose-600' },
 ];
 
-interface Props { clientId: string; businessName: string; }
+interface Props {
+  clientId: string;
+  businessName: string;
+  userEmail?: string;
+  onBack?: () => void;
+}
 
 function daysSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 }
 
-export default function Dashboard({ clientId, businessName }: Props) {
-  const [view, setView]               = useState<'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad'>('pipeline');
-  const [stats, setStats]             = useState<any>(null);
-  const [leads, setLeads]             = useState<any[]>([]);
+export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
+  const [view, setView]                 = useState<'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings'>('pipeline');
+  const [stats, setStats]               = useState<any>(null);
+  const [leads, setLeads]               = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
-  const [stageFilter, setStageFilter] = useState('');
-  const [search, setSearch]           = useState('');
-  const [page, setPage]               = useState(1);
-  const [total, setTotal]             = useState(0);
-  const [loading, setLoading]         = useState(true);
+  const [stageFilter, setStageFilter]   = useState('');
+  const [search, setSearch]             = useState('');
+  const [page, setPage]                 = useState(1);
+  const [total, setTotal]               = useState(0);
+  const [loading, setLoading]           = useState(true);
   const [selectedLead, setSelectedLead] = useState<any>(null);
-  const [toast, setToast]             = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -100,19 +110,27 @@ export default function Dashboard({ clientId, businessName }: Props) {
     { key: 'pipeline'  as const, label: 'Pipeline',    icon: LayoutGrid },
     { key: 'list'      as const, label: 'Leads',       icon: List },
     { key: 'agenda'    as const, label: 'Agenda',      icon: Clock },
-    { key: 'followups' as const, label: 'Follow-ups',  icon: Zap,   badge: urgentCount },
+    { key: 'followups' as const, label: 'Follow-ups',  icon: Zap,      badge: urgentCount },
     { key: 'dialpad'   as const, label: '📞 Ligar',    icon: Phone },
+    { key: 'settings'  as const, label: 'Settings',    icon: Settings },
   ];
 
   return (
     <div className="min-h-screen overflow-x-hidden">
 
-      {/* ── HEADER ─────────────────────────────────────────────────────────── */}
+      {/* ── HEADER ── */}
       <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 sticky top-0 z-30 shadow-xl shadow-slate-900/20">
         <div className="max-w-7xl mx-auto px-4 md:px-6 py-3.5 flex items-center justify-between gap-4">
 
-          {/* Brand */}
           <div className="flex items-center gap-3 min-w-0">
+            {onBack && (
+              <button
+                onClick={onBack}
+                className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition shrink-0"
+              >
+                <ArrowLeft size={14} /> Admin
+              </button>
+            )}
             <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/40 shrink-0">
               <span className="text-white text-base font-black tracking-tight">L</span>
             </div>
@@ -122,7 +140,6 @@ export default function Dashboard({ clientId, businessName }: Props) {
             </div>
           </div>
 
-          {/* Actions */}
           <div className="flex items-center gap-1 shrink-0">
             <a
               href={exportLeadsUrl(clientId)}
@@ -141,7 +158,6 @@ export default function Dashboard({ clientId, businessName }: Props) {
           </div>
         </div>
 
-        {/* Nav tabs — scrollable on mobile */}
         <div className="border-t border-white/10">
           <div className="max-w-7xl mx-auto px-4 md:px-6">
             <nav className="flex gap-0.5 nav-scroll overflow-x-auto">
@@ -168,30 +184,28 @@ export default function Dashboard({ clientId, businessName }: Props) {
         </div>
       </header>
 
-      {/* ── CONTENT ────────────────────────────────────────────────────────── */}
+      {/* ── CONTENT ── */}
       <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
 
         {/* KPI Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up">
-          {kpis.map(k => (
-            <div
-              key={k.label}
-              className={`bg-gradient-to-br ${k.gradient} rounded-2xl p-4 md:p-5 shadow-lg ${k.glow} text-white`}
-            >
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-semibold text-white/70 uppercase tracking-wide">{k.label}</span>
-                <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                  <k.icon size={14} className="text-white" />
+        {view !== 'settings' && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up">
+            {kpis.map(k => (
+              <div key={k.label} className={`bg-gradient-to-br ${k.gradient} rounded-2xl p-4 md:p-5 shadow-lg ${k.glow} text-white`}>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] font-semibold text-white/70 uppercase tracking-wide">{k.label}</span>
+                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
+                    <k.icon size={14} className="text-white" />
+                  </div>
                 </div>
+                <p className="text-3xl md:text-4xl font-black text-white">{k.value}</p>
               </div>
-              <p className="text-3xl md:text-4xl font-black text-white">{k.value}</p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Views */}
         <div className="animate-fade-in-up">
-
           {view === 'pipeline' && (
             <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
           )}
@@ -241,6 +255,7 @@ export default function Dashboard({ clientId, businessName }: Props) {
           {view === 'agenda'    && <Agenda appointments={appointments} />}
           {view === 'followups' && <Followups leads={leads} />}
           {view === 'dialpad'   && <Dialpad />}
+          {view === 'settings'  && <SettingsView userEmail={userEmail} />}
         </div>
       </main>
 
@@ -269,6 +284,124 @@ export default function Dashboard({ clientId, businessName }: Props) {
   );
 }
 
+// ── SETTINGS VIEW ─────────────────────────────────────────────────────────────
+
+function SettingsView({ userEmail }: { userEmail?: string }) {
+  const [pwd, setPwd]               = useState('');
+  const [pwd2, setPwd2]             = useState('');
+  const [pwdSaving, setPwdSaving]   = useState(false);
+  const [pwdMsg, setPwdMsg]         = useState('');
+  const [msg, setMsg]               = useState('');
+  const [msgSending, setMsgSending] = useState(false);
+  const [msgSent, setMsgSent]       = useState(false);
+
+  const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
+  async function changePassword(e: React.FormEvent) {
+    e.preventDefault();
+    setPwdMsg('');
+    if (pwd !== pwd2) { setPwdMsg('Passwords do not match.'); return; }
+    if (pwd.length < 8) { setPwdMsg('Minimum 8 characters.'); return; }
+    setPwdSaving(true);
+    const { error } = await supabase.auth.updateUser({ password: pwd });
+    if (error) setPwdMsg(error.message);
+    else { setPwdMsg('✓ Password updated successfully!'); setPwd(''); setPwd2(''); }
+    setPwdSaving(false);
+  }
+
+  async function sendSupport(e: React.FormEvent) {
+    e.preventDefault();
+    if (!msg.trim()) return;
+    setMsgSending(true);
+    try {
+      await fetch('/api/support', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg, email: userEmail || '' }),
+      });
+      setMsgSent(true);
+      setMsg('');
+    } catch {}
+    setMsgSending(false);
+  }
+
+  return (
+    <div className="max-w-md space-y-5 animate-fade-in-up">
+
+      {/* Account info */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
+        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Account</h3>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
+            <span className="text-white text-sm font-bold">{(userEmail || 'U')[0].toUpperCase()}</span>
+          </div>
+          <p className="text-sm text-gray-700 font-medium">{userEmail || '—'}</p>
+        </div>
+      </div>
+
+      {/* Change Password */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound size={16} className="text-blue-500" />
+          <h3 className="text-base font-bold text-gray-900">Change Password</h3>
+        </div>
+        <form onSubmit={changePassword} className="space-y-3">
+          <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="New password" className={inp} required />
+          <input type="password" value={pwd2} onChange={e => setPwd2(e.target.value)} placeholder="Confirm new password" className={inp} required />
+          {pwdMsg && (
+            <p className={`text-sm px-3 py-2 rounded-xl border ${
+              pwdMsg.startsWith('✓') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
+            }`}>{pwdMsg}</p>
+          )}
+          <button type="submit" disabled={pwdSaving} className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-blue-500/25 disabled:opacity-40">
+            {pwdSaving ? 'Saving…' : 'Update Password'}
+          </button>
+        </form>
+      </div>
+
+      {/* Contact Support */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <HeadphonesIcon size={16} className="text-blue-500" />
+          <h3 className="text-base font-bold text-gray-900">Contact Support</h3>
+        </div>
+        {msgSent ? (
+          <div className="text-center py-4 space-y-2">
+            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
+              <CheckCircle size={22} className="text-emerald-500" />
+            </div>
+            <p className="text-sm font-semibold text-gray-800">Message sent!</p>
+            <p className="text-xs text-gray-400">Bruno will contact you shortly.</p>
+            <button onClick={() => setMsgSent(false)} className="text-xs text-blue-500 hover:underline">Send another</button>
+          </div>
+        ) : (
+          <form onSubmit={sendSupport} className="space-y-3">
+            <textarea
+              value={msg}
+              onChange={e => setMsg(e.target.value)}
+              rows={4}
+              placeholder="Describe your issue or question…"
+              className={inp + ' resize-none'}
+              required
+            />
+            <button type="submit" disabled={msgSending} className="w-full py-3 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white text-sm font-bold rounded-xl transition disabled:opacity-40">
+              {msgSending ? 'Sending…' : 'Send Message'}
+            </button>
+          </form>
+        )}
+      </div>
+
+      {/* Sign Out */}
+      <button
+        onClick={() => supabase.auth.signOut()}
+        className="w-full flex items-center justify-center gap-2 py-3 border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-xl transition"
+      >
+        <LogOut size={15} /> Sign Out
+      </button>
+    </div>
+  );
+}
+
 // ── MODAL ──────────────────────────────────────────────────────────────────────
 
 interface ModalProps {
@@ -280,11 +413,11 @@ interface ModalProps {
 }
 
 function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalProps) {
-  const [notes, setNotes]       = useState(lead.notes || '');
-  const [saving, setSaving]     = useState(false);
+  const [notes, setNotes]               = useState(lead.notes || '');
+  const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
-  const stage = stages.find(s => s.key === currentStage);
-  const phone = lead.lead_phone;
+  const stage   = stages.find(s => s.key === currentStage);
+  const phone   = lead.lead_phone;
   const initials = (lead.lead_name || 'C')[0].toUpperCase();
 
   async function changeStage(newStage: string) {
@@ -306,13 +439,11 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
         className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto animate-fade-in-up"
         onClick={e => e.stopPropagation()}
       >
-        {/* Drag handle (mobile) */}
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
           <div className="w-10 h-1 bg-gray-300 rounded-full" />
         </div>
 
         <div className="p-5 sm:p-6 space-y-5">
-          {/* Header */}
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
@@ -328,7 +459,6 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg leading-none transition shrink-0">×</button>
           </div>
 
-          {/* Action buttons */}
           <div className="grid grid-cols-2 gap-2">
             <a
               href={`tel:+${phone}`}
@@ -344,7 +474,6 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
             </a>
           </div>
 
-          {/* Info */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 text-sm">
             <Row label="Phone"><span className="font-semibold text-gray-900">+{phone}</span></Row>
             {lead.lead_address  && <Row label="Address"><span>{lead.lead_address}</span></Row>}
@@ -361,7 +490,6 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
             </div>
           )}
 
-          {/* Change stage */}
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Move to Stage</p>
             <div className="flex flex-wrap gap-1.5">
@@ -382,7 +510,6 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
             </div>
           </div>
 
-          {/* Notes */}
           <div>
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Notes</p>
             <textarea
