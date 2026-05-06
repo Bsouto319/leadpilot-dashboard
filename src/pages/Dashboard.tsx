@@ -477,9 +477,13 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
+  const [editName, setEditName]         = useState(lead.lead_name || '');
+  const [editAddress, setEditAddress]   = useState(lead.lead_address || '');
+  const [editService, setEditService]   = useState(lead.service_type || '');
+  const [editMode, setEditMode]         = useState(false);
   const stage   = stages.find(s => s.key === currentStage);
   const phone   = lead.lead_phone;
-  const initials = (lead.lead_name || 'C')[0].toUpperCase();
+  const initials = (editName || 'C')[0].toUpperCase();
 
   async function changeStage(newStage: string) {
     setSaving(true);
@@ -491,6 +495,17 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
   async function saveNotes() {
     setSaving(true);
     await onNotesSave(lead.id, notes);
+    setSaving(false);
+  }
+
+  async function saveContactInfo() {
+    setSaving(true);
+    await updateLead(lead.id, {
+      lead_name:    editName.trim()    || undefined,
+      lead_address: editAddress.trim() || undefined,
+      service_type: editService.trim() || undefined,
+    });
+    setEditMode(false);
     setSaving(false);
   }
 
@@ -511,7 +526,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
                 <span className="text-white text-lg font-bold">{initials}</span>
               </div>
               <div>
-                <h2 className="text-lg font-bold text-gray-900">{lead.lead_name || 'Customer'}</h2>
+                <h2 className="text-lg font-bold text-gray-900">{editName || 'Customer'}</h2>
                 <span className={`inline-block mt-0.5 text-xs font-semibold px-2.5 py-0.5 rounded-full ${stage?.color}`}>
                   {stage?.label || currentStage}
                 </span>
@@ -535,13 +550,66 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
             </button>
           </div>
 
-          <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 text-sm">
-            <Row label="Phone"><span className="font-semibold text-gray-900">+{phone}</span></Row>
-            {lead.lead_address  && <Row label="Address"><span>{lead.lead_address}</span></Row>}
-            {lead.service_type  && <Row label="Service"><span className="capitalize">{lead.service_type.replace(/_/g, ' ')}</span></Row>}
-            {lead.scheduled_at  && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
-            {lead.source        && <Row label="Source"><span className="capitalize">{lead.source}</span></Row>}
-            <Row label="Received"><span>{new Date(lead.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>
+          {/* Contact info — view or edit */}
+          <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Info</span>
+              <button
+                onClick={() => setEditMode(m => !m)}
+                className="text-xs font-semibold text-blue-600 hover:text-blue-700 px-2 py-0.5 rounded-lg hover:bg-blue-50 transition"
+              >
+                {editMode ? 'Cancel' : 'Edit'}
+              </button>
+            </div>
+
+            {editMode ? (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-xs text-gray-400 font-medium">Name</label>
+                  <input
+                    value={editName}
+                    onChange={e => setEditName(e.target.value)}
+                    placeholder="Customer name"
+                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-medium">Address</label>
+                  <input
+                    value={editAddress}
+                    onChange={e => setEditAddress(e.target.value)}
+                    placeholder="Street, city, state"
+                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 font-medium">Service</label>
+                  <input
+                    value={editService}
+                    onChange={e => setEditService(e.target.value)}
+                    placeholder="e.g. tile installation"
+                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <button
+                  onClick={saveContactInfo}
+                  disabled={saving}
+                  className="w-full text-sm font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-40"
+                >
+                  {saving ? 'Saving…' : 'Save Contact Info'}
+                </button>
+              </div>
+            ) : (
+              <>
+                <Row label="Phone"><span className="font-semibold text-gray-900">+{phone}</span></Row>
+                <Row label="Name"><span className="font-medium text-gray-700">{editName || <span className="text-gray-300 italic">not set</span>}</span></Row>
+                <Row label="Address"><span>{editAddress || <span className="text-gray-300 italic">not set</span>}</span></Row>
+                <Row label="Service"><span className="capitalize">{editService?.replace(/_/g, ' ') || <span className="text-gray-300 italic">not set</span>}</span></Row>
+                {lead.scheduled_at && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
+                {lead.source       && <Row label="Source"><span className="capitalize">{lead.source}</span></Row>}
+                <Row label="Received"><span>{new Date(lead.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>
+              </>
+            )}
           </div>
 
           {lead.email_body && (
