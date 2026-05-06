@@ -1,4 +1,5 @@
-import { MessageSquare } from 'lucide-react';
+import { MessageSquare, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 interface Props {
   lead: any;
@@ -6,15 +7,17 @@ interface Props {
   onClick: () => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
+  onDelete?: (leadId: string) => void;
 }
 
 function minutesSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 60000);
 }
 
-export default function LeadCard({ lead, stages, onClick, onCall, onSms }: Props) {
+export default function LeadCard({ lead, stages, onClick, onCall, onSms, onDelete }: Props) {
   const stage = stages.find(s => s.key === lead.stage);
   const isNew = minutesSince(lead.created_at) < 60;
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   return (
     <div className="px-4 py-3.5 hover:bg-blue-50/40 active:bg-blue-50/60 transition flex items-center gap-3">
@@ -65,6 +68,27 @@ export default function LeadCard({ lead, stages, onClick, onCall, onSms }: Props
         >
           <MessageSquare size={15} />
         </button>
+        {onDelete && (
+          confirmDelete ? (
+            <button
+              onClick={e => { e.stopPropagation(); onDelete(lead.id); }}
+              onBlur={() => setConfirmDelete(false)}
+              className="px-2.5 py-2 rounded-xl bg-red-600 text-white text-[11px] font-bold active:bg-red-700 transition touch-manipulation whitespace-nowrap"
+              title="Confirm delete"
+              autoFocus
+            >
+              Sure?
+            </button>
+          ) : (
+            <button
+              onClick={e => { e.stopPropagation(); setConfirmDelete(true); }}
+              className="p-2.5 rounded-xl bg-slate-200 text-slate-500 hover:bg-red-100 hover:text-red-500 active:bg-red-200 transition touch-manipulation"
+              title="Delete lead"
+            >
+              <Trash2 size={15} />
+            </button>
+          )
+        )}
       </div>
     </div>
   );

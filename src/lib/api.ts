@@ -72,6 +72,12 @@ export async function updateLead(id: string, data: { stage?: string; notes?: str
   return { ok: !error };
 }
 
+export async function deleteLead(id: string) {
+  const { error } = await supabase.from('conversations').delete().eq('id', id);
+  if (error) console.error('deleteLead', error.message);
+  return { ok: !error };
+}
+
 // ── Export: still via API (needs auth) ───────────────────────────────────────
 
 export function exportLeadsUrl(clientId: string) {

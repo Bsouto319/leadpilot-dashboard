@@ -5,7 +5,8 @@ import {
   LayoutGrid, List, Clock, Zap, Settings, LogOut, ArrowLeft,
   KeyRound, HeadphonesIcon,
 } from 'lucide-react';
-import { fetchStats, fetchLeads, fetchAppointments, updateLead, exportLeadsUrl } from '../lib/api';
+import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl } from '../lib/api';
+import Contacts from '../components/Contacts';
 import { supabase } from '../lib/supabase';
 import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
@@ -34,7 +35,7 @@ function daysSince(d: string) {
 }
 
 export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
-  const [view, setView]                 = useState<'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings'>('pipeline');
+  const [view, setView]                 = useState<'pipeline' | 'list' | 'contacts' | 'agenda' | 'followups' | 'dialpad' | 'settings'>('pipeline');
   const [stats, setStats]               = useState<any>(null);
   const [leads, setLeads]               = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -92,6 +93,17 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     showToast('Notes saved');
   }
 
+  async function handleDelete(leadId: string) {
+    const { ok } = await deleteLead(leadId);
+    if (ok) {
+      showToast('Lead deleted');
+      if (selectedLead?.id === leadId) setSelectedLead(null);
+      load();
+    } else {
+      showToast('Failed to delete lead', 'error');
+    }
+  }
+
   function handleCall(phone: string) {
     setSelectedLead(null);
     setDialpadPhone(phone);
@@ -122,6 +134,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const navTabs = [
     { key: 'pipeline'  as const, label: 'Pipeline',    icon: LayoutGrid },
     { key: 'list'      as const, label: 'Leads',       icon: List },
+    { key: 'contacts'  as const, label: 'Contacts',    icon: Users },
     { key: 'agenda'    as const, label: 'Agenda',      icon: Clock },
     { key: 'followups' as const, label: 'Follow-ups',  icon: Zap,      badge: urgentCount },
     { key: 'dialpad'   as const, label: '📞 Ligar',    icon: Phone },
@@ -250,6 +263,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                     onClick={() => setSelectedLead(lead)}
                     onCall={phone => handleCall(phone)}
                     onSms={(id, phone) => handleSms(id, phone, lead.lead_name || '')}
+                    onDelete={handleDelete}
                   />
                 ))}
                 {!leads.length && !loading && (
@@ -270,6 +284,10 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                 </div>
               )}
             </div>
+          )}
+
+          {view === 'contacts' && (
+            <Contacts leads={leads} stages={STAGES} />
           )}
 
           {view === 'agenda' && (
@@ -296,6 +314,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           showToast={showToast}
           onCall={handleCall}
           onSms={(id, phone) => handleSms(id, phone, selectedLead?.lead_name || '')}
+          onDelete={handleDelete}
         />
       )}
 
@@ -451,9 +470,10 @@ interface ModalProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
+  onDelete?: (leadId: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, onSms }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, onSms, onDelete }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -568,6 +588,15 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
               {saving ? 'Saving…' : 'Save Notes'}
             </button>
           </div>
+
+          {onDelete && (
+            <button
+              onClick={() => { if (window.confirm('Delete this lead? This cannot be undone.')) { onDelete(lead.id); onClose(); } }}
+              className="w-full text-sm font-semibold px-4 py-2.5 text-red-600 bg-red-50 hover:bg-red-100 border border-red-200 rounded-xl transition"
+            >
+              Delete Lead
+            </button>
+          )}
         </div>
       </div>
     </div>
