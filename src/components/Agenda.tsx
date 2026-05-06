@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MapPin, MessageSquare } from 'lucide-react';
 
 interface Appointment {
   id: string;
@@ -13,6 +13,8 @@ interface Appointment {
 
 interface Props {
   appointments: Appointment[];
+  onCall?: (phone: string) => void;
+  onSms?: (aptId: string, phone: string, leadName: string) => void;
 }
 
 const STAGE_COLOR: Record<string, string> = {
@@ -45,7 +47,7 @@ function sameDay(a: Date, b: Date) {
          a.getDate()     === b.getDate();
 }
 
-export default function Agenda({ appointments }: Props) {
+export default function Agenda({ appointments, onCall, onSms }: Props) {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
   const [selected, setSelected]   = useState<Date>(() => { const t = new Date(); t.setHours(0,0,0,0); return t; });
 
@@ -161,12 +163,20 @@ export default function Agenda({ appointments }: Props) {
                   </div>
 
                   {/* Actions */}
-                  <a
-                    href={`tel:+${apt.lead_phone}`}
-                    className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1.5 rounded-lg transition shrink-0"
-                  >
-                    <Phone size={11} /> Call
-                  </a>
+                  <div className="flex gap-1.5 shrink-0">
+                    <button
+                      onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
+                      className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-2.5 py-1.5 rounded-lg transition touch-manipulation"
+                    >
+                      <Phone size={11} /> Call
+                    </button>
+                    <button
+                      onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
+                      className="flex items-center gap-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 px-2.5 py-1.5 rounded-lg transition touch-manipulation"
+                    >
+                      <MessageSquare size={11} /> SMS
+                    </button>
+                  </div>
                 </div>
               );
             })}

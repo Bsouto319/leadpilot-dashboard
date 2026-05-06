@@ -45,6 +45,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [loading, setLoading]           = useState(true);
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  const [dialpadPhone, setDialpadPhone] = useState('');
+  const [smsModal, setSmsModal]         = useState<{ leadId: string; phone: string; leadName: string } | null>(null);
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -88,6 +90,17 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   async function handleNotesSave(leadId: string, notes: string) {
     await updateLead(leadId, { notes });
     showToast('Notes saved');
+  }
+
+  function handleCall(phone: string) {
+    setSelectedLead(null);
+    setDialpadPhone(phone);
+    setView('dialpad');
+  }
+
+  function handleSms(leadId: string, phone: string, leadName: string) {
+    setSelectedLead(null);
+    setSmsModal({ leadId, phone, leadName });
   }
 
   const urgentCount = leads.filter(l =>
@@ -230,7 +243,14 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
               </div>
               <div className="divide-y divide-gray-50">
                 {leads.map(lead => (
-                  <LeadCard key={lead.id} lead={lead} stages={STAGES} onClick={() => setSelectedLead(lead)} />
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    stages={STAGES}
+                    onClick={() => setSelectedLead(lead)}
+                    onCall={phone => handleCall(phone)}
+                    onSms={(id, phone) => handleSms(id, phone, lead.lead_name || '')}
+                  />
                 ))}
                 {!leads.length && !loading && (
                   <div className="text-center py-16">
@@ -252,9 +272,15 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
             </div>
           )}
 
-          {view === 'agenda'    && <Agenda appointments={appointments} />}
+          {view === 'agenda' && (
+            <Agenda
+              appointments={appointments}
+              onCall={handleCall}
+              onSms={(id, phone, name) => handleSms(id, phone, name)}
+            />
+          )}
           {view === 'followups' && <Followups leads={leads} />}
-          {view === 'dialpad'   && <Dialpad />}
+          {view === 'dialpad'   && <Dialpad initialPhone={dialpadPhone} />}
           {view === 'settings'  && <SettingsView userEmail={userEmail} />}
         </div>
       </main>
@@ -267,6 +293,19 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           onClose={() => setSelectedLead(null)}
           onStageChange={handleStageChange}
           onNotesSave={handleNotesSave}
+          showToast={showToast}
+          onCall={handleCall}
+          onSms={(id, phone) => handleSms(id, phone, selectedLead?.lead_name || '')}
+        />
+      )}
+
+      {/* SMS Modal */}
+      {smsModal && (
+        <SmsModal
+          leadId={smsModal.leadId}
+          phone={smsModal.phone}
+          leadName={smsModal.leadName}
+          onClose={() => setSmsModal(null)}
           showToast={showToast}
         />
       )}
@@ -410,9 +449,11 @@ interface ModalProps {
   onStageChange: (id: string, stage: string) => void;
   onNotesSave: (id: string, notes: string) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
+  onCall?: (phone: string) => void;
+  onSms?: (leadId: string, phone: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, onSms }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -460,18 +501,18 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
           </div>
 
           <div className="grid grid-cols-2 gap-2">
-            <a
-              href={`tel:+${phone}`}
+            <button
+              onClick={() => onCall?.(`+${phone}`)}
               className="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
             >
               <PhoneCall size={15} /> Call
-            </a>
-            <a
-              href={`sms:+${phone}`}
+            </button>
+            <button
+              onClick={() => onSms?.(lead.id, phone)}
               className="flex items-center justify-center gap-2 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-3 rounded-xl transition border border-emerald-200"
             >
               <MessageSquare size={15} /> SMS
-            </a>
+            </button>
           </div>
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-2.5 text-sm">
@@ -527,6 +568,83 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave }: ModalP
               {saving ? 'Saving…' : 'Save Notes'}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── SMS MODAL ──────────────────────────────────────────────────────────────────
+
+interface SmsModalProps {
+  leadId: string; phone: string; leadName: string;
+  onClose: () => void;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+}
+
+function SmsModal({ leadId, phone, leadName, onClose, showToast }: SmsModalProps) {
+  const [text, setText]       = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    if (!text.trim()) return;
+    setSending(true);
+    try {
+      const r = await fetch(`${import.meta.env.VITE_API_URL}/api/admin/leads/${leadId}/send-sms`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-admin-key': import.meta.env.VITE_ADMIN_KEY || '',
+        },
+        body: JSON.stringify({ message: text.trim() }),
+      });
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      showToast('SMS sent!');
+      onClose();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to send SMS', 'error');
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
+      <div
+        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 animate-fade-in-up"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Send SMS</h3>
+            <p className="text-xs text-gray-400 mt-0.5">
+              To: {leadName || 'Lead'} · +{phone}
+            </p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg transition">×</button>
+        </div>
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) send(); }}
+          rows={4}
+          placeholder="Type your message…"
+          autoFocus
+          className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        />
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm font-semibold rounded-xl hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={send}
+            disabled={sending || !text.trim()}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-bold rounded-xl transition shadow-md shadow-emerald-500/25 disabled:opacity-40"
+          >
+            <MessageSquare size={14} /> {sending ? 'Sending…' : 'Send SMS'}
+          </button>
         </div>
       </div>
     </div>

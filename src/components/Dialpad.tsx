@@ -4,6 +4,8 @@ import { Device, Call } from '@twilio/voice-sdk';
 
 type Status = 'disconnected' | 'loading' | 'idle' | 'ringing' | 'active' | 'error';
 
+interface DialpadProps { initialPhone?: string; }
+
 const RESTRICTED_CODES = new Set([21216, 13225, 31005, 31009]);
 
 function friendlyError(err: any): string {
@@ -15,11 +17,11 @@ function friendlyError(err: any): string {
   return err?.message || 'Erro desconhecido';
 }
 
-export default function Dialpad() {
+export default function Dialpad({ initialPhone }: DialpadProps) {
   const [status, setStatus]             = useState<Status>('disconnected');
   const [errorMsg, setErrorMsg]         = useState('');
   const [callSid, setCallSid]           = useState('');
-  const [phoneInput, setPhoneInput]     = useState('');
+  const [phoneInput, setPhoneInput]     = useState(initialPhone || '');
   const [fromNumber, setFromNumber]     = useState('+19418456110');
   const [manualMode, setManualMode]     = useState(false);
   const [clientId, setClientId]         = useState<string | null>(null);
@@ -32,6 +34,13 @@ export default function Dialpad() {
     loadClient();
     return () => { deviceRef.current?.destroy(); };
   }, []);
+
+  useEffect(() => {
+    if (initialPhone) {
+      setPhoneInput(initialPhone);
+      if (!deviceRef.current) initDevice();
+    }
+  }, [initialPhone]);
 
   async function loadClient() {
     try {
