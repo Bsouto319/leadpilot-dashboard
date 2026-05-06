@@ -93,6 +93,17 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     showToast('Notes saved');
   }
 
+  async function handleContactSave(leadId: string, data: { lead_name?: string; lead_address?: string; service_type?: string }) {
+    const { ok } = await updateLead(leadId, data);
+    if (ok) {
+      showToast('Contact info saved');
+      setSelectedLead((l: any) => ({ ...l, ...data }));
+      setLeads(prev => prev.map(l => l.id === leadId ? { ...l, ...data } : l));
+    } else {
+      showToast('Failed to save', 'error');
+    }
+  }
+
   async function handleDelete(leadId: string) {
     const { ok } = await deleteLead(leadId);
     if (ok) {
@@ -311,6 +322,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           onClose={() => setSelectedLead(null)}
           onStageChange={handleStageChange}
           onNotesSave={handleNotesSave}
+          onContactSave={handleContactSave}
           showToast={showToast}
           onCall={handleCall}
           onSms={(id, phone) => handleSms(id, phone, selectedLead?.lead_name || '')}
@@ -467,13 +479,14 @@ interface ModalProps {
   onClose: () => void;
   onStageChange: (id: string, stage: string) => void;
   onNotesSave: (id: string, notes: string) => void;
+  onContactSave: (id: string, data: { lead_name?: string; lead_address?: string; service_type?: string }) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
   onDelete?: (leadId: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, onSms, onDelete }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onDelete }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -500,7 +513,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onCall, 
 
   async function saveContactInfo() {
     setSaving(true);
-    await updateLead(lead.id, {
+    await onContactSave(lead.id, {
       lead_name:    editName.trim()    || undefined,
       lead_address: editAddress.trim() || undefined,
       service_type: editService.trim() || undefined,
