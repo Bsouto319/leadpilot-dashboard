@@ -4,9 +4,21 @@ import { Device, Call } from '@twilio/voice-sdk';
 
 type Status = 'disconnected' | 'loading' | 'idle' | 'ringing' | 'active' | 'error';
 
+const RESTRICTED_CODES = new Set([21216, 13225, 31005, 31009]);
+
+function friendlyError(err: any): string {
+  const code = err?.code ?? err?.twilioError?.code;
+  const msg  = (err?.message || '').toLowerCase();
+  if (RESTRICTED_CODES.has(code) || msg.includes('not allowed') || msg.includes('blacklisted')) {
+    return `⚠️ Conta restrita pelo provedor — Twilio bloqueou ligações +1 nesta conta (Ticket #26755104). Aguardar liberação do suporte.`;
+  }
+  return err?.message || 'Erro desconhecido';
+}
+
 export default function Dialpad() {
   const [status, setStatus]             = useState<Status>('disconnected');
   const [errorMsg, setErrorMsg]         = useState('');
+  const [callSid, setCallSid]           = useState('');
   const [phoneInput, setPhoneInput]     = useState('');
   const [fromNumber, setFromNumber]     = useState('+19418456110');
   const [manualMode, setManualMode]     = useState(false);
@@ -52,9 +64,9 @@ export default function Dialpad() {
       deviceRef.current?.destroy();
       const device = new Device(data.token, { logLevel: 1 });
 
-      device.on('error', (err: Error) => {
+      device.on('error', (err: any) => {
         setStatus('error');
-        setErrorMsg(err.message);
+        setErrorMsg(friendlyError(err));
       });
 
       device.on('incoming', (call: Call) => {
@@ -130,9 +142,11 @@ export default function Dialpad() {
     try {
       const call = await deviceRef.current.connect({ params: { To: to } });
       callRef.current = call;
+      const sid = (call as any).parameters?.CallSid || '';
+      if (sid) setCallSid(sid);
       call.on('accept',     () => setStatus('active'));
-      call.on('disconnect', () => { callRef.current = null; setStatus('idle'); });
-      call.on('error',      (err: Error) => { callRef.current = null; setStatus('error'); setErrorMsg(err.message); });
+      call.on('disconnect', () => { callRef.current = null; setStatus('idle'); setCallSid(''); });
+      call.on('error',      (err: any) => { callRef.current = null; setStatus('error'); setCallSid(''); setErrorMsg(friendlyError(err)); });
     } catch (err: any) {
       setStatus('error');
       setErrorMsg(err.message);
@@ -283,9 +297,14 @@ export default function Dialpad() {
       </div>
 
       {/* Status bar */}
-      <div className={`flex items-center gap-2 text-sm px-3 py-2.5 rounded-xl ${statusConfig[status].cls}`}>
-        <PhoneCall size={14} className={status === 'active' ? 'animate-pulse' : ''} />
-        <span className="truncate font-medium">{statusConfig[status].label}</span>
+      <div className={`text-sm px-3 py-2.5 rounded-xl ${statusConfig[status].cls}`}>
+        <div className="flex items-center gap-2">
+          <PhoneCall size={14} className={status === 'active' ? 'animate-pulse' : ''} />
+          <span className="truncate font-medium">{statusConfig[status].label}</span>
+        </div>
+        {callSid && (
+          <p className="text-xs opacity-50 mt-1 font-mono truncate">SID: {callSid}</p>
+        )}
       </div>
     </div>
   );

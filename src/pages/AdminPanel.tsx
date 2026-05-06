@@ -13,6 +13,7 @@ interface Client {
   owner_email: string | null;
   owner_phone: string;
   twilio_number: string;
+  twilio_account_sid: string | null;
   active: boolean;
   niche: string;
   timezone: string;
@@ -37,9 +38,10 @@ export default function AdminPanel({ onViewClient }: { onViewClient: (c: any) =>
   const [errors, setErrors]         = useState<any[]>([]);
   const [tab, setTab]               = useState<'clients' | 'errors'>('clients');
   const [loading, setLoading]       = useState(true);
-  const [editTarget, setEditTarget] = useState<Client | null>(null);
-  const [inviteOpen, setInviteOpen] = useState(false);
-  const [toast, setToast]           = useState<{ msg: string; ok: boolean } | null>(null);
+  const [editTarget, setEditTarget]       = useState<Client | null>(null);
+  const [inviteOpen, setInviteOpen]       = useState(false);
+  const [subCreating, setSubCreating]     = useState<string | null>(null);
+  const [toast, setToast]                 = useState<{ msg: string; ok: boolean } | null>(null);
 
   function showToast(msg: string, ok = true) {
     setToast({ msg, ok });
@@ -74,6 +76,24 @@ export default function AdminPanel({ onViewClient }: { onViewClient: (c: any) =>
   }
 
   useEffect(() => { load(); }, []);
+
+  async function createSubaccount(c: Client) {
+    setSubCreating(c.id);
+    try {
+      const r = await fetch(`/api/admin/clients/${c.id}/create-subaccount`, {
+        method: 'POST',
+        headers: { 'x-admin-key': ADMIN_KEY },
+      });
+      const data = await r.json();
+      if (!r.ok) { showToast(data.error || 'Erro ao criar subconta', false); return; }
+      showToast(`Subconta criada: ${data.subaccountSid}`);
+      load();
+    } catch {
+      showToast('Erro ao criar subconta', false);
+    } finally {
+      setSubCreating(null);
+    }
+  }
 
   async function saveEdit(fields: Partial<Client>) {
     if (!editTarget) return;
@@ -217,6 +237,10 @@ export default function AdminPanel({ onViewClient }: { onViewClient: (c: any) =>
                       <span className="bg-gray-100 px-2 py-0.5 rounded-full">{leads} lead{leads !== 1 ? 's' : ''}</span>
                       {c.manual_mode && <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Manual</span>}
                       {!c.voice_enabled && <span className="bg-gray-100 px-2 py-0.5 rounded-full">Voice OFF</span>}
+                      {c.twilio_account_sid
+                        ? <span className="bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Subconta ✓</span>
+                        : <span className="bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Conta principal</span>
+                      }
                     </div>
 
                     <div className="flex gap-2">
@@ -232,6 +256,16 @@ export default function AdminPanel({ onViewClient }: { onViewClient: (c: any) =>
                       >
                         <Edit2 size={14} /> Edit
                       </button>
+                      {!c.twilio_account_sid && (
+                        <button
+                          onClick={() => createSubaccount(c)}
+                          disabled={subCreating === c.id}
+                          title="Criar subconta Twilio isolada"
+                          className="flex items-center justify-center px-3 py-2.5 text-sm font-semibold text-violet-700 bg-violet-100 hover:bg-violet-200 rounded-xl transition touch-manipulation disabled:opacity-40"
+                        >
+                          {subCreating === c.id ? '…' : '⊕'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
