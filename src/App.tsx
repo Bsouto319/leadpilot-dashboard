@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from './lib/supabase';
-import Login from './pages/Login';
+import Login, { ResetPassword } from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 
@@ -11,6 +11,7 @@ export default function App() {
   const [client, setClient]               = useState<any>(null);
   const [loading, setLoading]             = useState(true);
   const [viewAsClient, setViewAsClient]   = useState<any>(null);
+  const [isRecovery, setIsRecovery]       = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -19,7 +20,13 @@ export default function App() {
       else setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') {
+        setIsRecovery(true);
+        setSession(s);
+        setLoading(false);
+        return;
+      }
       setSession(s);
       if (s) loadClient(s.user.id, s.user.email);
       else { setClient(null); setViewAsClient(null); setLoading(false); }
@@ -39,6 +46,8 @@ export default function App() {
       <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
     </div>
   );
+
+  if (isRecovery) return <ResetPassword onDone={() => { setIsRecovery(false); supabase.auth.signOut(); }} />;
 
   if (!session) return <Login />;
 
