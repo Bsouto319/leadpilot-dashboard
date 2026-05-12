@@ -92,7 +92,7 @@ export default function Login() {
     setLoading(true);
     setError('');
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://leadpilot.contatobtech.com.br',
+      redirectTo: 'https://app.contatobtech.com.br',
     });
     if (error) setError(error.message);
     else setForgotSent(true);
