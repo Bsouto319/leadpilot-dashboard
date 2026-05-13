@@ -14,6 +14,16 @@ function minutesSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 60000);
 }
 
+function formatEntryTime(d: string) {
+  const date = new Date(d);
+  const now  = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const isYesterday = new Date(now.setDate(now.getDate() - 1)).toDateString() === date.toDateString();
+  if (isToday)     return `Today ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  if (isYesterday) return `Yesterday ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export default function LeadCard({ lead, stages, onClick, onCall, onSms, onDelete }: Props) {
   const stage = stages.find(s => s.key === lead.stage);
   const isNew = minutesSince(lead.created_at) < 60;
@@ -45,8 +55,8 @@ export default function LeadCard({ lead, stages, onClick, onCall, onSms, onDelet
           </div>
         </div>
 
-        <p className="text-xs text-gray-400 shrink-0 hidden sm:block font-medium">
-          {new Date(lead.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        <p className={`text-xs shrink-0 hidden sm:block font-semibold ${minutesSince(lead.created_at) < 60 ? 'text-green-600' : 'text-gray-400'}`}>
+          {formatEntryTime(lead.created_at)}
         </p>
       </button>
 

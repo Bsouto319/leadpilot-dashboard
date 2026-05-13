@@ -5,6 +5,16 @@ function minutesSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 60000);
 }
 
+function formatEntryTime(d: string) {
+  const date = new Date(d);
+  const now  = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const isYesterday = new Date(now.setDate(now.getDate() - 1)).toDateString() === date.toDateString();
+  if (isToday)     return `Today ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  if (isYesterday) return `Yesterday ${date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; stages: Stage[]; onSelect: (l: Lead) => void }) {
   const byStage = (key: string) => leads.filter(l => l.stage === key);
 
@@ -56,6 +66,9 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                     {lead.lead_address && (
                       <p className="text-xs text-slate-400 mt-1 truncate">📍 {lead.lead_address}</p>
                     )}
+                    <p className={`text-xs mt-2 font-semibold ${isNew ? 'text-green-600' : 'text-slate-400'}`}>
+                      🕐 {formatEntryTime(lead.created_at)}
+                    </p>
                   </button>
                 );
               })}
