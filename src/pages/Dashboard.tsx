@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
-  LayoutGrid, List, Clock, Zap, Settings, LogOut, ArrowLeft,
+  LogOut, ArrowLeft,
   KeyRound, HeadphonesIcon,
 } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl } from '../lib/api';
@@ -15,12 +15,12 @@ import Followups from '../components/Followups';
 import Dialpad from '../components/Dialpad';
 
 export const STAGES = [
-  { key: 'new_lead',         label: 'New Lead',        color: 'bg-slate-100 text-slate-600' },
-  { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-100 text-sky-700' },
-  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-100 text-amber-700' },
-  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-100 text-emerald-700' },
-  { key: 'completed',        label: 'Completed',        color: 'bg-violet-100 text-violet-700' },
-  { key: 'no_show',          label: 'No Show',          color: 'bg-rose-100 text-rose-600' },
+  { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: '#16a34a', cardBorder: '#22c55e' },
+  { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-400/15 text-sky-300',         headerBg: '#0284c7', cardBorder: '#38bdf8' },
+  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-400/15 text-amber-300',     headerBg: '#d97706', cardBorder: '#fbbf24' },
+  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-400/15 text-emerald-300', headerBg: '#059669', cardBorder: '#34d399' },
+  { key: 'completed',        label: 'Completed',        color: 'bg-teal-400/15 text-teal-300',       headerBg: '#0d9488', cardBorder: '#2dd4bf' },
+  { key: 'no_show',          label: 'No Show',          color: 'bg-rose-400/15 text-rose-300',       headerBg: '#dc2626', cardBorder: '#f87171' },
 ];
 
 interface Props {
@@ -34,8 +34,10 @@ function daysSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 }
 
+type ViewType = 'pipeline' | 'list' | 'contacts' | 'agenda' | 'followups' | 'dialpad' | 'settings';
+
 export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
-  const [view, setView]                 = useState<'pipeline' | 'list' | 'contacts' | 'agenda' | 'followups' | 'dialpad' | 'settings'>('pipeline');
+  const [view, setView]                 = useState<ViewType>('pipeline');
   const [stats, setStats]               = useState<any>(null);
   const [leads, setLeads]               = useState<any[]>([]);
   const [appointments, setAppointments] = useState<any[]>([]);
@@ -44,6 +46,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [page, setPage]                 = useState(1);
   const [total, setTotal]               = useState(0);
   const [loading, setLoading]           = useState(true);
+  const [refreshing, setRefreshing]     = useState(false);
   const [selectedLead, setSelectedLead] = useState<any>(null);
   const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [dialpadPhone, setDialpadPhone] = useState('');
@@ -55,7 +58,6 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   }, []);
 
   const load = useCallback(async () => {
-    setLoading(true);
     const [s, l, a] = await Promise.all([
       fetchStats(clientId),
       fetchLeads({ clientId, page, search, stage: stageFilter }),
@@ -66,6 +68,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     setTotal(l.count || 0);
     setAppointments(a);
     setLoading(false);
+    setRefreshing(false);
   }, [clientId, page, search, stageFilter]);
 
   useEffect(() => { load(); }, [load]);
@@ -78,7 +81,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
         filter: `client_id=eq.${clientId}`,
       }, () => { load(); })
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    const interval = setInterval(() => load(), 15000);
+    return () => { supabase.removeChannel(channel); clearInterval(interval); };
   }, [clientId, load]);
 
   async function handleStageChange(leadId: string, newStage: string) {
@@ -136,136 +140,136 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     : 0;
 
   const kpis = [
-    { label: 'Leads Today',  value: stats?.leadsToday ?? '–',      icon: Users,      gradient: 'from-blue-500 to-blue-600',      glow: 'shadow-blue-500/25' },
-    { label: 'Calls Today',  value: stats?.callsToday ?? '–',      icon: Phone,      gradient: 'from-emerald-500 to-green-600',  glow: 'shadow-emerald-500/25' },
-    { label: 'Scheduled',    value: stats?.scheduled  ?? '–',      icon: Calendar,   gradient: 'from-violet-500 to-purple-600',  glow: 'shadow-violet-500/25' },
-    { label: 'Conversion',   value: stats ? `${conversion}%` : '–', icon: TrendingUp, gradient: 'from-orange-500 to-amber-500',   glow: 'shadow-orange-500/25' },
+    { label: 'Leads Today', value: stats?.leadsToday ?? '–',       icon: Users,      gradient: 'from-sky-500 to-blue-600',       glow: 'shadow-sky-500/30'     },
+    { label: 'Calls Today', value: stats?.callsToday ?? '–',       icon: Phone,      gradient: 'from-violet-500 to-purple-600',  glow: 'shadow-violet-500/30'  },
+    { label: 'Scheduled',   value: stats?.scheduled  ?? '–',       icon: Calendar,   gradient: 'from-emerald-500 to-teal-600',   glow: 'shadow-emerald-500/30' },
+    { label: 'Conversion',  value: stats ? `${conversion}%` : '–', icon: TrendingUp, gradient: 'from-amber-500 to-orange-500',   glow: 'shadow-amber-500/30'   },
   ];
 
-  const navTabs = [
-    { key: 'pipeline'  as const, label: 'Pipeline',    icon: LayoutGrid },
-    { key: 'list'      as const, label: 'Leads',       icon: List },
-    { key: 'contacts'  as const, label: 'Contacts',    icon: Users },
-    { key: 'agenda'    as const, label: 'Agenda',      icon: Clock },
-    { key: 'followups' as const, label: 'Follow-ups',  icon: Zap,      badge: urgentCount },
-    { key: 'dialpad'   as const, label: '📞 Ligar',    icon: Phone },
-    { key: 'settings'  as const, label: 'Settings',    icon: Settings },
+  const navTabs: { key: ViewType; label: string; badge?: number }[] = [
+    { key: 'pipeline',  label: 'Pipeline'   },
+    { key: 'list',      label: 'Leads'      },
+    { key: 'contacts',  label: 'Contacts'   },
+    { key: 'agenda',    label: 'Agenda'     },
+    { key: 'followups', label: 'Follow-ups', badge: urgentCount },
+    { key: 'dialpad',   label: '📞 Call'    },
+    { key: 'settings',  label: 'Settings'   },
   ];
 
   return (
-    <div className="min-h-screen overflow-x-hidden">
+    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(160deg, #0e1f4a 0%, #162d6b 40%, #0f2057 100%)' }}>
 
       {/* ── HEADER ── */}
-      <header className="bg-gradient-to-r from-slate-900 via-slate-800 to-blue-900 sticky top-0 z-30 shadow-xl shadow-slate-900/20">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 py-3.5 flex items-center justify-between gap-4">
+      <header className="flex-shrink-0 border-b border-white/10" style={{ background: 'rgba(10,20,60,0.7)', backdropFilter: 'blur(12px)' }}>
+        <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
 
-          <div className="flex items-center gap-3 min-w-0">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition shrink-0"
-              >
-                <ArrowLeft size={14} /> Admin
-              </button>
-            )}
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-lg shadow-blue-500/40 shrink-0">
-              <span className="text-white text-base font-black tracking-tight">L</span>
+          {/* Back button */}
+          {onBack && (
+            <button
+              onClick={onBack}
+              className="flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white/80 hover:bg-white/10 px-2.5 py-1.5 rounded-lg transition shrink-0"
+            >
+              <ArrowLeft size={13} /> Admin
+            </button>
+          )}
+
+          {/* Logo */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/40">
+              <span className="text-white font-black text-sm">L</span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold text-blue-300 uppercase tracking-widest leading-none mb-0.5">LeadPilot</p>
-              <p className="text-base md:text-lg font-bold text-white leading-none truncate">{businessName}</p>
+            <div>
+              <p className="text-white font-black text-lg leading-none tracking-tight truncate max-w-[160px]">{businessName}</p>
+              <p className="text-blue-200/50 text-[10px] font-bold tracking-wide">LEADPILOT</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          {/* Nav tabs */}
+          <div className="flex items-center gap-0.5 ml-2 overflow-x-auto">
+            {navTabs.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setView(t.key)}
+                className={`relative shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                  view === t.key ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
+                }`}
+              >
+                {t.label}
+                {t.badge != null && t.badge > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full">
+                    {t.badge > 9 ? '9+' : t.badge}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+
+          {/* Actions */}
+          <div className="ml-auto flex items-center gap-2 shrink-0">
             <a
               href={exportLeadsUrl(clientId)}
               target="_blank" rel="noreferrer"
-              className="hidden sm:flex items-center gap-1.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition"
+              className="hidden sm:flex items-center gap-1.5 text-xs font-bold text-white/50 hover:text-white/80 hover:bg-white/10 px-3 py-2 rounded-xl border border-white/10 transition"
             >
-              <Download size={14} /> Export
+              <Download size={13} /> Export
             </a>
             <button
-              onClick={load}
-              className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-white hover:bg-white/10 px-3 py-2 rounded-lg transition"
+              onClick={() => { setRefreshing(true); load(); }}
+              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
+              title="Refresh"
             >
-              <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
-              <span className="hidden sm:inline">Refresh</span>
+              <RefreshCw size={14} className={`text-white/60 ${refreshing ? 'animate-spin' : ''}`} />
             </button>
-          </div>
-        </div>
-
-        <div className="border-t border-white/10">
-          <div className="max-w-7xl mx-auto px-4 md:px-6">
-            <nav className="flex gap-0.5 nav-scroll overflow-x-auto">
-              {navTabs.map(({ key, label, badge }) => (
-                <button
-                  key={key}
-                  onClick={() => setView(key)}
-                  className={`relative shrink-0 flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition border-b-2 whitespace-nowrap ${
-                    view === key
-                      ? 'text-white border-blue-400'
-                      : 'text-slate-400 hover:text-slate-200 border-transparent hover:border-slate-600'
-                  }`}
-                >
-                  {label}
-                  {badge != null && badge > 0 && (
-                    <span className="w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                      {badge > 9 ? '9+' : badge}
-                    </span>
-                  )}
-                </button>
-              ))}
-            </nav>
           </div>
         </div>
       </header>
 
-      {/* ── CONTENT ── */}
-      <main className="max-w-7xl mx-auto px-4 md:px-6 py-6 space-y-6">
-
-        {/* KPI Cards */}
-        {view !== 'settings' && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 animate-fade-in-up">
-            {kpis.map(k => (
-              <div key={k.label} className={`bg-gradient-to-br ${k.gradient} rounded-2xl p-4 md:p-5 shadow-lg ${k.glow} text-white`}>
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] font-semibold text-white/70 uppercase tracking-wide">{k.label}</span>
-                  <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center">
-                    <k.icon size={14} className="text-white" />
-                  </div>
-                </div>
-                <p className="text-3xl md:text-4xl font-black text-white">{k.value}</p>
+      {/* ── STAT CARDS ── */}
+      {view === 'pipeline' && (
+        <div className="flex-shrink-0 px-4 sm:px-6 py-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {kpis.map(k => (
+            <div key={k.label} className="border border-white/10 rounded-xl p-3 flex items-center gap-3 hover:bg-white/[0.06] transition" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${k.gradient} flex items-center justify-center shadow-lg ${k.glow} flex-shrink-0`}>
+                <k.icon size={20} className="text-white" />
               </div>
-            ))}
+              <div>
+                <p className="text-4xl font-black text-white leading-none">{loading ? '–' : k.value}</p>
+                <p className="text-blue-200/60 text-[10px] font-black tracking-widest uppercase mt-0.5">{k.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── MAIN CONTENT ── */}
+      <main className="flex-1 overflow-hidden min-h-0">
+
+        {view === 'pipeline' && (
+          <div className="h-full px-4 sm:px-6 pb-6">
+            <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
           </div>
         )}
 
-        {/* Views */}
-        <div className="animate-fade-in-up">
-          {view === 'pipeline' && (
-            <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
-          )}
-
-          {view === 'list' && (
-            <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm">
-              <div className="p-4 border-b border-gray-100 flex gap-3 flex-wrap">
+        {view === 'list' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
+            <div className="border border-white/10 rounded-2xl overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
+              <div className="p-4 border-b border-white/10 flex gap-3 flex-wrap">
                 <input
                   value={search}
                   onChange={e => { setSearch(e.target.value); setPage(1); }}
                   placeholder="Search by name or phone…"
-                  className="flex-1 min-w-48 px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="flex-1 min-w-48 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
                 />
                 <select
                   value={stageFilter}
                   onChange={e => { setStageFilter(e.target.value); setPage(1); }}
-                  className="px-3 py-2 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">All Stages</option>
                   {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
               </div>
-              <div className="divide-y divide-gray-50">
+              <div className="divide-y divide-white/5">
                 {leads.map(lead => (
                   <LeadCard
                     key={lead.id}
@@ -279,42 +283,61 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                 ))}
                 {!leads.length && !loading && (
                   <div className="text-center py-16">
-                    <Users size={32} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-400 text-sm">No leads found.</p>
+                    <Users size={32} className="mx-auto text-white/20 mb-2" />
+                    <p className="text-white/30 text-sm">No leads found.</p>
                   </div>
                 )}
               </div>
               {total > 200 && (
-                <div className="p-4 flex items-center justify-between border-t border-gray-100">
-                  <p className="text-sm text-gray-500">{total} total leads</p>
+                <div className="p-4 flex items-center justify-between border-t border-white/10">
+                  <p className="text-sm text-white/40">{total} total leads</p>
                   <div className="flex gap-2">
-                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">←</button>
-                    <span className="px-3 py-1 text-sm text-gray-600">Page {page}</span>
-                    <button disabled={page * 200 >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1 text-sm border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50">→</button>
+                    <button disabled={page === 1} onClick={() => setPage(p => p - 1)} className="px-3 py-1 text-sm border border-white/10 text-white/50 rounded-lg disabled:opacity-40 hover:bg-white/5">←</button>
+                    <span className="px-3 py-1 text-sm text-white/40">Page {page}</span>
+                    <button disabled={page * 200 >= total} onClick={() => setPage(p => p + 1)} className="px-3 py-1 text-sm border border-white/10 text-white/50 rounded-lg disabled:opacity-40 hover:bg-white/5">→</button>
                   </div>
                 </div>
               )}
             </div>
-          )}
+          </div>
+        )}
 
-          {view === 'contacts' && (
+        {view === 'contacts' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
             <Contacts leads={leads} stages={STAGES} />
-          )}
+          </div>
+        )}
 
-          {view === 'agenda' && (
+        {view === 'agenda' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
             <Agenda
               appointments={appointments}
               onCall={handleCall}
               onSms={(id, phone, name) => handleSms(id, phone, name)}
             />
-          )}
-          {view === 'followups' && <Followups leads={leads} />}
-          {view === 'dialpad'   && <Dialpad initialPhone={dialpadPhone} />}
-          {view === 'settings'  && <SettingsView userEmail={userEmail} />}
-        </div>
+          </div>
+        )}
+
+        {view === 'followups' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
+            <Followups leads={leads} />
+          </div>
+        )}
+
+        {view === 'dialpad' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
+            <Dialpad initialPhone={dialpadPhone} />
+          </div>
+        )}
+
+        {view === 'settings' && (
+          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
+            <SettingsView userEmail={userEmail} />
+          </div>
+        )}
       </main>
 
-      {/* Lead Modal */}
+      {/* ── LEAD MODAL ── */}
       {selectedLead && (
         <LeadModal
           lead={selectedLead}
@@ -330,7 +353,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
         />
       )}
 
-      {/* SMS Modal */}
+      {/* ── SMS MODAL ── */}
       {smsModal && (
         <SmsModal
           leadId={smsModal.leadId}
@@ -341,10 +364,10 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
         />
       )}
 
-      {/* Toast */}
+      {/* ── TOAST ── */}
       {toast && (
-        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-3 rounded-2xl shadow-xl text-sm font-semibold text-white animate-fade-in-up ${
-          toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'
+        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white transition-all ${
+          toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
         }`}>
           {toast.type === 'success' ? <CheckCircle size={15} /> : <XCircle size={15} />}
           {toast.msg}
@@ -354,7 +377,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   );
 }
 
-// ── SETTINGS VIEW ─────────────────────────────────────────────────────────────
+// ── SETTINGS VIEW ──────────────────────────────────────────────────────────────
 
 function SettingsView({ userEmail }: { userEmail?: string }) {
   const [pwd, setPwd]               = useState('');
@@ -365,7 +388,7 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
   const [msgSending, setMsgSending] = useState(false);
   const [msgSent, setMsgSent]       = useState(false);
 
-  const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const inp = 'w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition';
 
   async function changePassword(e: React.FormEvent) {
     e.preventDefault();
@@ -396,53 +419,55 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
   }
 
   return (
-    <div className="max-w-md space-y-5 animate-fade-in-up">
+    <div className="max-w-md space-y-4">
 
       {/* Account info */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
-        <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3">Account</h3>
+      <div className="border border-white/10 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <p className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Account</p>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shrink-0 shadow-sm">
-            <span className="text-white text-sm font-bold">{(userEmail || 'U')[0].toUpperCase()}</span>
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+            <span className="text-white text-sm font-black">{(userEmail || 'U')[0].toUpperCase()}</span>
           </div>
-          <p className="text-sm text-gray-700 font-medium">{userEmail || '—'}</p>
+          <p className="text-sm text-white/70 font-medium">{userEmail || '—'}</p>
         </div>
       </div>
 
       {/* Change Password */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
+      <div className="border border-white/10 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.05)' }}>
         <div className="flex items-center gap-2 mb-4">
-          <KeyRound size={16} className="text-blue-500" />
-          <h3 className="text-base font-bold text-gray-900">Change Password</h3>
+          <KeyRound size={16} className="text-blue-400" />
+          <h3 className="text-sm font-black text-white">Change Password</h3>
         </div>
         <form onSubmit={changePassword} className="space-y-3">
           <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} placeholder="New password" className={inp} required />
           <input type="password" value={pwd2} onChange={e => setPwd2(e.target.value)} placeholder="Confirm new password" className={inp} required />
           {pwdMsg && (
             <p className={`text-sm px-3 py-2 rounded-xl border ${
-              pwdMsg.startsWith('✓') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'
+              pwdMsg.startsWith('✓')
+                ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20'
+                : 'bg-red-500/10 text-red-300 border-red-500/20'
             }`}>{pwdMsg}</p>
           )}
-          <button type="submit" disabled={pwdSaving} className="w-full py-3 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-blue-500/25 disabled:opacity-40">
+          <button type="submit" disabled={pwdSaving} className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white text-sm font-black rounded-xl transition shadow-lg shadow-blue-500/25 disabled:opacity-40">
             {pwdSaving ? 'Saving…' : 'Update Password'}
           </button>
         </form>
       </div>
 
       {/* Contact Support */}
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5">
+      <div className="border border-white/10 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.05)' }}>
         <div className="flex items-center gap-2 mb-4">
-          <HeadphonesIcon size={16} className="text-blue-500" />
-          <h3 className="text-base font-bold text-gray-900">Contact Support</h3>
+          <HeadphonesIcon size={16} className="text-violet-400" />
+          <h3 className="text-sm font-black text-white">Contact Support</h3>
         </div>
         {msgSent ? (
           <div className="text-center py-4 space-y-2">
-            <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mx-auto">
-              <CheckCircle size={22} className="text-emerald-500" />
+            <div className="w-12 h-12 rounded-xl bg-emerald-500/20 flex items-center justify-center mx-auto border border-emerald-500/30">
+              <CheckCircle size={22} className="text-emerald-400" />
             </div>
-            <p className="text-sm font-semibold text-gray-800">Message sent!</p>
-            <p className="text-xs text-gray-400">Bruno will contact you shortly.</p>
-            <button onClick={() => setMsgSent(false)} className="text-xs text-blue-500 hover:underline">Send another</button>
+            <p className="text-sm font-black text-white">Message sent!</p>
+            <p className="text-xs text-white/40">Bruno will contact you shortly.</p>
+            <button onClick={() => setMsgSent(false)} className="text-xs text-blue-400 hover:text-blue-300">Send another</button>
           </div>
         ) : (
           <form onSubmit={sendSupport} className="space-y-3">
@@ -454,7 +479,7 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
               className={inp + ' resize-none'}
               required
             />
-            <button type="submit" disabled={msgSending} className="w-full py-3 bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white text-sm font-bold rounded-xl transition disabled:opacity-40">
+            <button type="submit" disabled={msgSending} className="w-full py-3 bg-white/10 hover:bg-white/15 text-white text-sm font-black rounded-xl border border-white/10 transition disabled:opacity-40">
               {msgSending ? 'Sending…' : 'Send Message'}
             </button>
           </form>
@@ -464,7 +489,7 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
       {/* Sign Out */}
       <button
         onClick={() => supabase.auth.signOut()}
-        className="w-full flex items-center justify-center gap-2 py-3 border border-red-200 text-red-500 hover:bg-red-50 text-sm font-semibold rounded-xl transition"
+        className="w-full flex items-center justify-center gap-2 py-3 border border-red-500/30 text-red-400 hover:bg-red-500/10 text-sm font-black rounded-xl transition"
       >
         <LogOut size={15} /> Sign Out
       </button>
@@ -472,7 +497,7 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
   );
 }
 
-// ── MODAL ──────────────────────────────────────────────────────────────────────
+// ── LEAD MODAL ─────────────────────────────────────────────────────────────────
 
 interface ModalProps {
   lead: any; stages: any[];
@@ -522,10 +547,12 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
     setSaving(false);
   }
 
+  const inp = 'mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
+
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto animate-fade-in-up"
+        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
@@ -536,7 +563,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-500/30 shrink-0">
-                <span className="text-white text-lg font-bold">{initials}</span>
+                <span className="text-white text-lg font-black">{initials}</span>
               </div>
               <div>
                 <h2 className="text-lg font-bold text-gray-900">{editName || 'Customer'}</h2>
@@ -551,7 +578,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => onCall?.(`+${phone}`)}
-              className="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 px-4 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
+              className="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
             >
               <PhoneCall size={15} /> Call
             </button>
@@ -563,7 +590,6 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             </button>
           </div>
 
-          {/* Contact info — view or edit */}
           <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
             <div className="flex items-center justify-between">
               <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact Info</span>
@@ -577,38 +603,10 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
 
             {editMode ? (
               <div className="space-y-2">
-                <div>
-                  <label className="text-xs text-gray-400 font-medium">Name</label>
-                  <input
-                    value={editName}
-                    onChange={e => setEditName(e.target.value)}
-                    placeholder="Customer name"
-                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 font-medium">Address</label>
-                  <input
-                    value={editAddress}
-                    onChange={e => setEditAddress(e.target.value)}
-                    placeholder="Street, city, state"
-                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 font-medium">Service</label>
-                  <input
-                    value={editService}
-                    onChange={e => setEditService(e.target.value)}
-                    placeholder="e.g. tile installation"
-                    className="mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <button
-                  onClick={saveContactInfo}
-                  disabled={saving}
-                  className="w-full text-sm font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-40"
-                >
+                <div><label className="text-xs text-gray-400 font-medium">Name</label><input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Customer name" className={inp} /></div>
+                <div><label className="text-xs text-gray-400 font-medium">Address</label><input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Street, city, state" className={inp} /></div>
+                <div><label className="text-xs text-gray-400 font-medium">Service</label><input value={editService} onChange={e => setEditService(e.target.value)} placeholder="e.g. tile installation" className={inp} /></div>
+                <button onClick={saveContactInfo} disabled={saving} className="w-full text-sm font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-40">
                   {saving ? 'Saving…' : 'Save Contact Info'}
                 </button>
               </div>
@@ -664,7 +662,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             <button
               onClick={saveNotes}
               disabled={saving}
-              className="mt-2 w-full text-sm font-semibold px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition disabled:opacity-40"
+              className="mt-2 w-full text-sm font-bold px-4 py-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition disabled:opacity-40"
             >
               {saving ? 'Saving…' : 'Save Notes'}
             </button>
@@ -720,15 +718,13 @@ function SmsModal({ leadId, phone, leadName, onClose, showToast }: SmsModalProps
   return (
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
       <div
-        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4 animate-fade-in-up"
+        className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-base font-bold text-gray-900">Send SMS</h3>
-            <p className="text-xs text-gray-400 mt-0.5">
-              To: {leadName || 'Lead'} · +{phone}
-            </p>
+            <p className="text-xs text-gray-400 mt-0.5">To: {leadName || 'Lead'} · +{phone}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg transition">×</button>
         </div>
@@ -742,16 +738,11 @@ function SmsModal({ leadId, phone, leadName, onClose, showToast }: SmsModalProps
           className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
         />
         <div className="flex gap-2">
-          <button
-            onClick={onClose}
-            className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm font-semibold rounded-xl hover:bg-gray-50 transition"
-          >
-            Cancel
-          </button>
+          <button onClick={onClose} className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm font-semibold rounded-xl hover:bg-gray-50 transition">Cancel</button>
           <button
             onClick={send}
             disabled={sending || !text.trim()}
-            className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white text-sm font-bold rounded-xl transition shadow-md shadow-emerald-500/25 disabled:opacity-40"
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-emerald-500/25 disabled:opacity-40"
           >
             <MessageSquare size={14} /> {sending ? 'Sending…' : 'Send SMS'}
           </button>
