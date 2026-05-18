@@ -4,6 +4,7 @@ interface Lead {
   lead_phone: string;
   service_type: string;
   stage: string;
+  call_status?: string | null;
   source?: string;
   scheduled_at?: string;
   lead_address?: string;
@@ -35,8 +36,18 @@ function formatEntryTime(d: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+const CALL_ATTEMPTED = ['queued', 'initiated', 'ringing', 'in-progress', 'completed', 'no-answer', 'busy', 'failed'];
+
 export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; stages: Stage[]; onSelect: (l: Lead) => void }) {
-  const byStage = (key: string) => leads.filter(l => l.stage === key);
+  const byStage = (key: string) => {
+    if (key === 'ai_responded') {
+      return leads.filter(l => l.stage === 'ai_responded' || (l.stage === 'new_lead' && l.call_status && CALL_ATTEMPTED.includes(l.call_status)));
+    }
+    if (key === 'new_lead') {
+      return leads.filter(l => l.stage === 'new_lead' && (!l.call_status || !CALL_ATTEMPTED.includes(l.call_status)));
+    }
+    return leads.filter(l => l.stage === key);
+  };
 
   return (
     <div className="flex gap-2.5 h-full overflow-x-auto pb-2 [&::-webkit-scrollbar]:h-1.5 [&::-webkit-scrollbar-track]:bg-white/5 [&::-webkit-scrollbar-thumb]:bg-white/20 [&::-webkit-scrollbar-thumb]:rounded-full">
