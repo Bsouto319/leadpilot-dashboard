@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
@@ -51,6 +51,25 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [dialpadPhone, setDialpadPhone] = useState('');
   const [smsModal, setSmsModal]         = useState<{ leadId: string; phone: string; leadName: string } | null>(null);
+  const [newLeadAlert, setNewLeadAlert] = useState(false);
+
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  function playNewLeadSound() {
+    try {
+      const ctx = new AudioContext();
+      ([[ 880, 0,    0.15 ], [ 1100, 0.18, 0.15 ]] as [number,number,number][]).forEach(([freq, start, dur]) => {
+        const osc = ctx.createOscillator(); const gain = ctx.createGain();
+        osc.connect(gain); gain.connect(ctx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        gain.gain.setValueAtTime(0.4, ctx.currentTime + start);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+        osc.start(ctx.currentTime + start); osc.stop(ctx.currentTime + start + dur);
+      });
+      setTimeout(() => ctx.close(), 1000);
+    } catch { /* AudioContext not available */ }
+  }
 
   const showToast = useCallback((msg: string, type: 'success' | 'error' = 'success') => {
     setToast({ msg, type });
@@ -77,9 +96,21 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     const channel = supabase
       .channel('realtime-leads')
       .on('postgres_changes', {
-        event: '*', schema: 'public', table: 'conversations',
+        event: 'INSERT', schema: 'public', table: 'conversations',
         filter: `client_id=eq.${clientId}`,
-      }, () => { load(); })
+      }, () => {
+        playNewLeadSound();
+        if (viewRef.current !== 'pipeline') setNewLeadAlert(true);
+        load();
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'conversations',
+        filter: `client_id=eq.${clientId}`,
+      }, () => load())
+      .on('postgres_changes', {
+        event: 'DELETE', schema: 'public', table: 'conversations',
+        filter: `client_id=eq.${clientId}`,
+      }, () => load())
       .subscribe();
     const interval = setInterval(() => load(), 15000);
     return () => { supabase.removeChannel(channel); clearInterval(interval); };
@@ -146,8 +177,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     { label: 'Conversion',  value: stats ? `${conversion}%` : '–', icon: TrendingUp, gradient: 'from-amber-500 to-orange-500',   glow: 'shadow-amber-500/30'   },
   ];
 
-  const navTabs: { key: ViewType; label: string; badge?: number }[] = [
-    { key: 'pipeline',  label: 'Pipeline'   },
+  const navTabs: { key: ViewType; label: string; badge?: number; alert?: boolean }[] = [
+    { key: 'pipeline',  label: 'Pipeline', alert: newLeadAlert },
     { key: 'list',      label: 'Leads'      },
     { key: 'contacts',  label: 'Contacts'   },
     { key: 'agenda',    label: 'Agenda'     },
@@ -189,7 +220,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
             {navTabs.map(t => (
               <button
                 key={t.key}
-                onClick={() => setView(t.key)}
+                onClick={() => { setView(t.key); if (t.key === 'pipeline') setNewLeadAlert(false); }}
                 className={`relative shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                   view === t.key ? 'bg-white/15 text-white' : 'text-white/40 hover:text-white/70 hover:bg-white/5'
                 }`}
@@ -199,6 +230,9 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                   <span className="ml-1 inline-flex items-center justify-center w-4 h-4 bg-red-500 text-white text-[9px] font-black rounded-full">
                     {t.badge > 9 ? '9+' : t.badge}
                   </span>
+                )}
+                {t.alert && (
+                  <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-green-400 rounded-full animate-pulse" />
                 )}
               </button>
             ))}
