@@ -56,8 +56,9 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const opts: MediaRecorderOptions = { audioBitsPerSecond: 24000 };
-      if (MediaRecorder.isTypeSupported('audio/webm')) opts.mimeType = 'audio/webm';
-      else if (MediaRecorder.isTypeSupported('audio/ogg')) opts.mimeType = 'audio/ogg';
+      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) opts.mimeType = 'audio/webm;codecs=opus';
+      else if (MediaRecorder.isTypeSupported('audio/webm')) opts.mimeType = 'audio/webm';
+      else if (MediaRecorder.isTypeSupported('audio/mp4')) opts.mimeType = 'audio/mp4'; // iOS Safari
       const mr = new MediaRecorder(stream, opts);
       chunks.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunks.current.push(e.data); };
@@ -95,7 +96,7 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
     setError('');
     try {
       // Strip codec params from content-type (e.g. "audio/webm; codecs=opus" → "audio/webm")
-      const baseType = audioBlob.type.split(';')[0].trim() || 'audio/webm';
+      const baseType = audioBlob.type.split(';')[0].trim() || 'audio/mp4';
       const r = await fetch(
         `${API}/api/admin/audio-call-preview?clientId=${encodeURIComponent(clientId)}`,
         {
