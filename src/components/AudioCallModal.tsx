@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react';
-import { Mic, MicOff, Send, Loader, X, Volume2, PhoneCall, RefreshCw } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Mic, MicOff, Loader, X, Volume2, PhoneCall, RefreshCw } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL as string;
 const KEY = import.meta.env.VITE_ADMIN_KEY as string;
+const MAX_SECONDS = 30;
 
 interface Props {
   phone: string;
@@ -21,22 +22,43 @@ interface PreviewData {
 }
 
 export default function AudioCallModal({ phone, leadName, clientId, onClose, showToast }: Props) {
-  const [recording, setRecording] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const [audioUrl, setAudioUrl]   = useState('');
-  const [status, setStatus]       = useState<Status>('idle');
-  const [preview, setPreview]     = useState<PreviewData | null>(null);
-  const [callSid, setCallSid]     = useState('');
-  const [error, setError]         = useState('');
-  const mrRef   = useRef<MediaRecorder | null>(null);
-  const chunks  = useRef<Blob[]>([]);
+  const [recording, setRecording]     = useState(false);
+  const [audioBlob, setAudioBlob]     = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl]       = useState('');
+  const [status, setStatus]           = useState<Status>('idle');
+  const [preview, setPreview]         = useState<PreviewData | null>(null);
+  const [callSid, setCallSid]         = useState('');
+  const [error, setError]             = useState('');
+  const [countdown, setCountdown]     = useState(MAX_SECONDS);
+  const mrRef      = useRef<MediaRecorder | null>(null);
+  const chunks     = useRef<Blob[]>([]);
+  const timerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => () => { clearInterval(timerRef.current!); }, []);
+
+  function startCountdown() {
+    setCountdown(MAX_SECONDS);
+    timerRef.current = setInterval(() => {
+      setCountdown(prev => {
+        if (prev <= 1) { stopRecording(); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+  }
+
+  function stopRecording() {
+    clearInterval(timerRef.current!);
+    mrRef.current?.stop();
+    setRecording(false);
+  }
 
   async function startRecording() {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mr = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : 'audio/ogg',
-      });
+      const opts: MediaRecorderOptions = { audioBitsPerSecond: 24000 };
+      if (MediaRecorder.isTypeSupported('audio/webm')) opts.mimeType = 'audio/webm';
+      else if (MediaRecorder.isTypeSupported('audio/ogg')) opts.mimeType = 'audio/ogg';
+      const mr = new MediaRecorder(stream, opts);
       chunks.current = [];
       mr.ondataavailable = e => { if (e.data.size > 0) chunks.current.push(e.data); };
       mr.onstop = () => {
@@ -53,14 +75,10 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
       setStatus('idle');
       setPreview(null);
       setError('');
+      startCountdown();
     } catch {
       setError('Não foi possível acessar o microfone.');
     }
-  }
-
-  function stopRecording() {
-    mrRef.current?.stop();
-    setRecording(false);
   }
 
   function reset() {
@@ -76,11 +94,16 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
     setStatus('processing');
     setError('');
     try {
-      const r = await fetch(`${API}/api/admin/audio-call-preview?clientId=${encodeURIComponent(clientId)}`, {
-        method: 'POST',
-        headers: { 'Content-Type': audioBlob.type, 'x-admin-key': KEY },
-        body: audioBlob,
-      });
+      // Strip codec params from content-type (e.g. "audio/webm; codecs=opus" → "audio/webm")
+      const baseType = audioBlob.type.split(';')[0].trim() || 'audio/webm';
+      const r = await fetch(
+        `${API}/api/admin/audio-call-preview?clientId=${encodeURIComponent(clientId)}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': baseType, 'x-admin-key': KEY },
+          body: audioBlob,
+        }
+      );
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
       setPreview(data);
@@ -129,42 +152,42 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
               <h3 className="text-base font-black text-gray-900 flex items-center gap-2">
                 <Volume2 size={16} className="text-purple-500" /> Áudio PT/ES → Ligação EN
               </h3>
-              <p className="text-xs text-gray-400 mt-0.5">
-                Para: {leadName || 'Lead'} · {phone}
-              </p>
+              <p className="text-xs text-gray-400 mt-0.5">Para: {leadName || 'Lead'} · {phone}</p>
             </div>
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 transition">
               <X size={16} />
             </button>
           </div>
 
-          {/* ── STEP 1: RECORD ── */}
-          {status !== 'done' && (
+          {/* ── RECORD ── */}
+          {status !== 'done' && status !== 'preview' && status !== 'calling' && (
             <>
-              {status === 'idle' && !audioBlob && (
+              {!audioBlob && !recording && (
                 <p className="text-xs text-gray-500 bg-purple-50 border border-purple-100 rounded-xl px-3 py-2.5 leading-relaxed">
-                  Grave sua mensagem em <strong>português ou espanhol</strong>. O sistema vai transcrever, traduzir para inglês, gerar a voz e você ouve antes de ligar.
+                  Grave em <strong>português ou espanhol</strong> (máx. {MAX_SECONDS}s). O sistema transcreve, traduz e você ouve antes de ligar.
                 </p>
               )}
 
               {!recording ? (
                 <button
                   onClick={startRecording}
-                  disabled={status === 'processing' || status === 'calling'}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-sm font-black rounded-xl transition disabled:opacity-40 shadow-lg shadow-purple-500/25"
+                  disabled={status === 'processing'}
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-black rounded-xl transition disabled:opacity-40 shadow-lg shadow-purple-500/25"
                 >
                   <Mic size={15} /> {audioBlob ? 'Regravar' : 'Gravar mensagem'}
                 </button>
               ) : (
                 <button
                   onClick={stopRecording}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-500 active:bg-red-600 text-white text-sm font-black rounded-xl transition animate-pulse shadow-lg shadow-red-500/25"
+                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-500 text-white text-sm font-black rounded-xl animate-pulse shadow-lg shadow-red-500/25"
                 >
                   <MicOff size={15} /> Parar gravação
+                  <span className="ml-auto text-xs font-mono bg-red-600 px-2 py-0.5 rounded-lg">
+                    {countdown}s
+                  </span>
                 </button>
               )}
 
-              {/* Original audio preview */}
               {audioUrl && !recording && (
                 <div className="space-y-1">
                   <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide">Sua gravação</p>
@@ -172,26 +195,33 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
                 </div>
               )}
 
-              {/* Process button */}
               {audioBlob && !recording && status === 'idle' && (
                 <button
                   onClick={processAudio}
                   className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm font-black rounded-xl transition shadow-lg shadow-purple-500/25"
                 >
-                  <Send size={15} /> Processar e ouvir tradução
+                  <Volume2 size={15} /> Processar e ouvir tradução
                 </button>
               )}
 
-              {/* Processing spinner */}
               {status === 'processing' && (
                 <div className="flex items-center justify-center gap-2 py-3 text-sm text-purple-600 font-semibold">
                   <Loader size={16} className="animate-spin" /> Transcrevendo e traduzindo…
                 </div>
               )}
+
+              {status === 'error' && error && (
+                <div className="space-y-2">
+                  <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">{error}</p>
+                  <button onClick={reset} className="w-full py-2.5 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
+                    Tentar novamente
+                  </button>
+                </div>
+              )}
             </>
           )}
 
-          {/* ── STEP 2: PREVIEW ── */}
+          {/* ── PREVIEW ── */}
           {(status === 'preview' || status === 'calling') && preview && (
             <div className="space-y-3">
               <div className="bg-gray-50 border border-gray-200 rounded-xl p-3 space-y-2 text-xs">
@@ -200,15 +230,14 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
                   <p className="text-gray-700 italic">"{preview.transcription}"</p>
                 </div>
                 <div>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-0.5">Traduzido (EN) — voz que o lead vai ouvir</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-wide mb-0.5">Voz que o lead vai ouvir (EN)</p>
                   <p className="text-gray-900 font-semibold">"{preview.translation}"</p>
                 </div>
               </div>
 
-              {/* English TTS audio preview */}
               <div className="space-y-1">
                 <p className="text-[10px] font-semibold text-purple-600 uppercase tracking-wide flex items-center gap-1">
-                  <Volume2 size={10} /> Ouça a voz em inglês antes de ligar
+                  <Volume2 size={10} /> Ouça antes de ligar
                 </p>
                 <audio controls src={previewAudioUrl} className="w-full h-9 rounded-xl" />
               </div>
@@ -228,36 +257,25 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
                 >
                   {status === 'calling'
                     ? <><Loader size={15} className="animate-spin" /> Ligando…</>
-                    : <><PhoneCall size={15} /> Confirmar e Ligar</>
-                  }
+                    : <><PhoneCall size={15} /> Confirmar e Ligar</>}
                 </button>
               </div>
             </div>
           )}
 
-          {/* ── STEP 3: DONE ── */}
+          {/* ── DONE ── */}
           {status === 'done' && (
             <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-2">
-              <p className="text-xs font-black text-green-700 flex items-center gap-1.5">✅ Ligação realizada!</p>
+              <p className="text-xs font-black text-green-700">✅ Ligação realizada!</p>
               {preview && (
-                <div className="space-y-1">
-                  <p className="text-xs text-gray-600"><span className="font-semibold">Transcrito:</span> {preview.transcription}</p>
-                  <p className="text-xs text-gray-600"><span className="font-semibold">Traduzido:</span> {preview.translation}</p>
+                <div className="space-y-1 text-xs">
+                  <p className="text-gray-600"><span className="font-semibold">PT:</span> {preview.transcription}</p>
+                  <p className="text-gray-600"><span className="font-semibold">EN:</span> {preview.translation}</p>
                 </div>
               )}
               {callSid && <p className="text-[10px] text-gray-400 font-mono">SID: {callSid}</p>}
               <button onClick={onClose} className="w-full mt-1 py-2 text-sm font-bold text-green-700 bg-green-100 hover:bg-green-200 rounded-xl transition">
                 Fechar
-              </button>
-            </div>
-          )}
-
-          {/* Error */}
-          {status === 'error' && error && (
-            <div className="space-y-2">
-              <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2.5">{error}</p>
-              <button onClick={reset} className="w-full py-2.5 text-sm font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-xl transition">
-                Tentar novamente
               </button>
             </div>
           )}
