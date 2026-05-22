@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MessageSquare, MapPin, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MessageSquare, MapPin, X, Volume2 } from 'lucide-react';
 
 interface Appointment {
   id: string;
@@ -15,6 +15,7 @@ interface Props {
   appointments: Appointment[];
   onCall?: (phone: string) => void;
   onSms?: (aptId: string, phone: string, leadName: string) => void;
+  onAudioCall?: (phone: string, leadName?: string) => void;
 }
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -37,7 +38,7 @@ function sameDay(a: Date, b: Date) {
          a.getDate()     === b.getDate();
 }
 
-export default function Agenda({ appointments, onCall, onSms }: Props) {
+export default function Agenda({ appointments, onCall, onSms, onAudioCall }: Props) {
   const today = new Date(); today.setHours(0,0,0,0);
   const [viewDate, setViewDate]   = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected]   = useState<Date | null>(null);
@@ -240,20 +241,29 @@ export default function Agenda({ appointments, onCall, onSms }: Props) {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-2 shrink-0">
+                    <div className="flex flex-col gap-1.5 shrink-0">
+                      <div className="flex gap-1.5">
+                        <button
+                          onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition shadow-lg"
+                          style={{ background: 'linear-gradient(135deg, #3b82f6, #4f46e5)', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}
+                        >
+                          <Phone size={12} /> Call
+                        </button>
+                        <button
+                          onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition"
+                          style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
+                        >
+                          <MessageSquare size={12} /> SMS
+                        </button>
+                      </div>
                       <button
-                        onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
-                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition shadow-lg"
-                        style={{ background: 'linear-gradient(135deg, #3b82f6, #4f46e5)', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}
+                        onClick={() => onAudioCall?.(`+${apt.lead_phone}`, apt.lead_name || '')}
+                        className="flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition w-full"
+                        style={{ background: 'rgba(147,51,234,0.2)', border: '1px solid rgba(147,51,234,0.4)', color: '#c084fc' }}
                       >
-                        <Phone size={12} /> Call
-                      </button>
-                      <button
-                        onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
-                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition"
-                        style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
-                      >
-                        <MessageSquare size={12} /> SMS
+                        <Volume2 size={12} /> Áudio PT→EN
                       </button>
                     </div>
                   </div>

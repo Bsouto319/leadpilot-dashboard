@@ -3,7 +3,7 @@ import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
   LogOut, ArrowLeft,
-  KeyRound, HeadphonesIcon, Mail, Image,
+  KeyRound, HeadphonesIcon, Mail, Image, Volume2,
 } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -12,6 +12,7 @@ import Pipeline from '../components/Pipeline';
 import Agenda from '../components/Agenda';
 import Followups from '../components/Followups';
 import Dialpad from '../components/Dialpad';
+import AudioCallModal from '../components/AudioCallModal';
 
 export const STAGES = [
   { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: '#16a34a', cardBorder: '#22c55e' },
@@ -51,6 +52,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [dialpadPhone, setDialpadPhone] = useState('');
   const [smsModal, setSmsModal]         = useState<{ leadId: string; phone: string; leadName: string } | null>(null);
   const [emailModal, setEmailModal]     = useState<{ leadId: string; leadName: string } | null>(null);
+  const [audioCallModal, setAudioCallModal] = useState<{ phone: string; leadName?: string } | null>(null);
   const [newLeadAlert, setNewLeadAlert] = useState(false);
 
   const viewRef = useRef(view);
@@ -164,6 +166,11 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   function handleEmail(leadId: string, leadName: string) {
     setSelectedLead(null);
     setEmailModal({ leadId, leadName });
+  }
+
+  function handleAudioCall(phone: string, leadName?: string) {
+    setSelectedLead(null);
+    setAudioCallModal({ phone, leadName });
   }
 
   const urgentCount = leads.filter(l =>
@@ -346,6 +353,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
               appointments={appointments}
               onCall={handleCall}
               onSms={(id, phone, name) => handleSms(id, phone, name)}
+              onAudioCall={(phone, name) => handleAudioCall(phone, name)}
             />
           </div>
         )}
@@ -382,6 +390,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           onCall={handleCall}
           onSms={(id, phone) => handleSms(id, phone, selectedLead?.lead_name || '')}
           onEmail={(id) => handleEmail(id, selectedLead?.lead_name || '')}
+          onAudioCall={(phone, name) => handleAudioCall(phone, name)}
           onDelete={handleDelete}
         />
       )}
@@ -403,6 +412,17 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           leadId={emailModal.leadId}
           leadName={emailModal.leadName}
           onClose={() => setEmailModal(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── AUDIO CALL MODAL ── */}
+      {audioCallModal && (
+        <AudioCallModal
+          phone={audioCallModal.phone}
+          leadName={audioCallModal.leadName}
+          clientId={clientId}
+          onClose={() => setAudioCallModal(null)}
           showToast={showToast}
         />
       )}
@@ -552,10 +572,11 @@ interface ModalProps {
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
   onEmail?: (leadId: string) => void;
+  onAudioCall?: (phone: string, name?: string) => void;
   onDelete?: (leadId: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onEmail, onDelete }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onEmail, onAudioCall, onDelete }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -629,7 +650,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg leading-none transition shrink-0">×</button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => onCall?.(`+${phone}`)}
               className="flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
@@ -647,6 +668,12 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
               className="flex items-center justify-center gap-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-3 rounded-xl transition border border-violet-200"
             >
               <Mail size={14} /> Email
+            </button>
+            <button
+              onClick={() => onAudioCall?.(`+${phone}`, lead.lead_name)}
+              className="flex items-center justify-center gap-1.5 text-sm font-semibold text-purple-700 bg-purple-50 hover:bg-purple-100 px-3 py-3 rounded-xl transition border border-purple-200"
+            >
+              <Volume2 size={14} /> Áudio PT→EN
             </button>
           </div>
 
