@@ -76,16 +76,10 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
     setStatus('processing');
     setError('');
     try {
-      const base64 = await new Promise<string>((res, rej) => {
-        const fr = new FileReader();
-        fr.onload  = () => res((fr.result as string).split(',')[1]);
-        fr.onerror = rej;
-        fr.readAsDataURL(audioBlob);
-      });
-      const r = await fetch(`${API}/api/admin/audio-call-preview`, {
+      const r = await fetch(`${API}/api/admin/audio-call-preview?clientId=${encodeURIComponent(clientId)}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
-        body: JSON.stringify({ audioBase64: base64, audioMimetype: audioBlob.type, clientId }),
+        headers: { 'Content-Type': audioBlob.type, 'x-admin-key': KEY },
+        body: audioBlob,
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`);
