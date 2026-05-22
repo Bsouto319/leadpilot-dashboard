@@ -1,8 +1,8 @@
-import { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
-  LogOut, ArrowLeft,
+  LogOut, ArrowLeft, Settings,
   KeyRound, HeadphonesIcon, Mail, Image, Volume2,
 } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail } from '../lib/api';
@@ -199,10 +199,10 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   ];
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(160deg, #0e1f4a 0%, #162d6b 40%, #0f2057 100%)' }}>
+    <div className="flex flex-col overflow-hidden" style={{ height: '100dvh', background: 'linear-gradient(160deg, #0e1f4a 0%, #162d6b 40%, #0f2057 100%)' }}>
 
       {/* ── HEADER ── */}
-      <header className="flex-shrink-0 border-b border-white/10" style={{ background: 'rgba(10,20,60,0.7)', backdropFilter: 'blur(12px)' }}>
+      <header className="flex-shrink-0 border-b border-white/10" style={{ background: 'rgba(10,20,60,0.7)', backdropFilter: 'blur(12px)', paddingTop: 'env(safe-area-inset-top)' }}>
         <div className="px-4 sm:px-6 py-3 flex items-center gap-3">
 
           {/* Back button */}
@@ -226,8 +226,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
             </div>
           </div>
 
-          {/* Nav tabs */}
-          <div className="flex items-center gap-0.5 ml-2 overflow-x-auto">
+          {/* Nav tabs — desktop only, mobile uses bottom nav */}
+          <div className="hidden sm:flex items-center gap-0.5 ml-2 overflow-x-auto">
             {navTabs.map(t => (
               <button
                 key={t.key}
@@ -429,13 +429,45 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
       {/* ── TOAST ── */}
       {toast && (
-        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white transition-all ${
-          toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
+        <div className={`fixed z-50 flex items-center gap-2 px-4 py-2.5 rounded-2xl shadow-lg text-sm font-semibold text-white transition-all
+          bottom-24 left-1/2 -translate-x-1/2 sm:bottom-5 sm:left-auto sm:right-5 sm:translate-x-0 whitespace-nowrap
+          ${toast.type === 'success' ? 'bg-emerald-500' : 'bg-red-500'
         }`}>
           {toast.type === 'success' ? <CheckCircle size={15} /> : <XCircle size={15} />}
           {toast.msg}
         </div>
       )}
+
+      {/* ── MOBILE BOTTOM NAV ── */}
+      <nav className="sm:hidden flex-shrink-0 border-t border-white/10" style={{
+        background: 'rgba(8,15,50,0.97)',
+        backdropFilter: 'blur(20px)',
+        paddingBottom: 'env(safe-area-inset-bottom)',
+      }}>
+        <div className="flex">
+          {([
+            { key: 'pipeline',  icon: TrendingUp, label: 'Pipeline' },
+            { key: 'agenda',    icon: Calendar,   label: 'Agenda'   },
+            { key: 'list',      icon: Users,       label: 'Leads'   },
+            { key: 'dialpad',   icon: Phone,       label: 'Call'    },
+            { key: 'settings',  icon: Settings,    label: 'Settings'},
+          ] as { key: ViewType; icon: React.ElementType; label: string }[]).map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => { setView(tab.key); if (tab.key === 'pipeline') setNewLeadAlert(false); }}
+              className={`flex-1 flex flex-col items-center gap-1 py-3 transition-colors relative active:opacity-70 ${
+                view === tab.key ? 'text-blue-400' : 'text-white/35'
+              }`}
+            >
+              {tab.key === 'pipeline' && newLeadAlert && (
+                <span className="absolute top-2.5 right-[calc(50%-14px)] w-2.5 h-2.5 bg-green-400 rounded-full animate-pulse border-2 border-[#080f32]" />
+              )}
+              <tab.icon size={22} strokeWidth={view === tab.key ? 2.5 : 1.8} />
+              <span className="text-[10px] font-bold tracking-wide">{tab.label}</span>
+            </button>
+          ))}
+        </div>
+      </nav>
     </div>
   );
 }

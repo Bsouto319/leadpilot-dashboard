@@ -140,10 +140,10 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
-      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+      <div className="bg-white w-full sm:max-w-sm rounded-t-3xl sm:rounded-2xl shadow-2xl" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} onClick={e => e.stopPropagation()}>
 
         <div className="flex justify-center pt-3 pb-1 sm:hidden">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          <div className="w-12 h-1.5 bg-gray-200 rounded-full" />
         </div>
 
         <div className="p-5 space-y-4">
@@ -173,17 +173,17 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
                 <button
                   onClick={startRecording}
                   disabled={status === 'processing'}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm font-black rounded-xl transition disabled:opacity-40 shadow-lg shadow-purple-500/25"
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-purple-600 active:bg-purple-800 text-white text-sm font-black rounded-2xl transition disabled:opacity-40 shadow-lg shadow-purple-500/25 min-h-[56px]"
                 >
-                  <Mic size={15} /> {audioBlob ? 'Regravar' : 'Gravar mensagem'}
+                  <Mic size={18} /> {audioBlob ? 'Regravar' : 'Gravar mensagem'}
                 </button>
               ) : (
                 <button
                   onClick={stopRecording}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-red-500 text-white text-sm font-black rounded-xl animate-pulse shadow-lg shadow-red-500/25"
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-red-500 active:bg-red-700 text-white text-sm font-black rounded-2xl animate-pulse shadow-lg shadow-red-500/25 min-h-[56px]"
                 >
-                  <MicOff size={15} /> Parar gravação
-                  <span className="ml-auto text-xs font-mono bg-red-600 px-2 py-0.5 rounded-lg">
+                  <MicOff size={18} /> Parar gravação
+                  <span className="ml-auto text-base font-mono bg-red-600 px-3 py-1 rounded-xl">
                     {countdown}s
                   </span>
                 </button>
@@ -199,9 +199,9 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
               {audioBlob && !recording && status === 'idle' && (
                 <button
                   onClick={processAudio}
-                  className="w-full flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white text-sm font-black rounded-xl transition shadow-lg shadow-purple-500/25"
+                  className="w-full flex items-center justify-center gap-2 py-4 bg-gradient-to-r from-purple-500 to-indigo-600 active:from-purple-700 active:to-indigo-800 text-white text-sm font-black rounded-2xl transition shadow-lg shadow-purple-500/25 min-h-[56px]"
                 >
-                  <Volume2 size={15} /> Processar e ouvir tradução
+                  <Volume2 size={18} /> Processar e ouvir tradução
                 </button>
               )}
 
@@ -254,7 +254,7 @@ export default function AudioCallModal({ phone, leadName, clientId, onClose, sho
                 <button
                   onClick={confirmCall}
                   disabled={status === 'calling'}
-                  className="flex-1 flex items-center justify-center gap-2 py-3 bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white text-sm font-black rounded-xl transition shadow-lg shadow-green-500/25 disabled:opacity-50"
+                  className="flex-1 flex items-center justify-center gap-2 py-3.5 bg-gradient-to-r from-green-500 to-emerald-600 active:from-green-700 active:to-emerald-800 text-white text-sm font-black rounded-xl transition shadow-lg shadow-green-500/25 disabled:opacity-50 min-h-[52px]"
                 >
                   {status === 'calling'
                     ? <><Loader size={15} className="animate-spin" /> Ligando…</>

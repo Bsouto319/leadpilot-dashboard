@@ -99,11 +99,11 @@ export default function Agenda({ appointments, onCall, onSms, onAudioCall }: Pro
             </button>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition">
-              <ChevronLeft size={17} />
+            <button onClick={prevMonth} className="p-3 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition active:bg-white/20 min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <ChevronLeft size={18} />
             </button>
-            <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition">
-              <ChevronRight size={17} />
+            <button onClick={nextMonth} className="p-3 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition active:bg-white/20 min-w-[44px] min-h-[44px] flex items-center justify-center">
+              <ChevronRight size={18} />
             </button>
           </div>
         </div>
@@ -241,29 +241,29 @@ export default function Agenda({ appointments, onCall, onSms, onAudioCall }: Pro
                     </div>
 
                     {/* Actions */}
-                    <div className="flex flex-col gap-1.5 shrink-0">
-                      <div className="flex gap-1.5">
+                    <div className="flex flex-col gap-2 shrink-0">
+                      <div className="flex gap-2">
                         <button
                           onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
-                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition shadow-lg"
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl text-white transition shadow-lg active:opacity-70 min-h-[44px]"
                           style={{ background: 'linear-gradient(135deg, #3b82f6, #4f46e5)', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}
                         >
-                          <Phone size={12} /> Call
+                          <Phone size={14} /> Call
                         </button>
                         <button
                           onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
-                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition"
+                          className="flex items-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl text-white transition active:opacity-70 min-h-[44px]"
                           style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
                         >
-                          <MessageSquare size={12} /> SMS
+                          <MessageSquare size={14} /> SMS
                         </button>
                       </div>
                       <button
                         onClick={() => onAudioCall?.(`+${apt.lead_phone}`, apt.lead_name || '')}
-                        className="flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition w-full"
+                        className="flex items-center justify-center gap-1.5 text-xs font-bold px-3 py-2.5 rounded-xl text-white transition w-full active:opacity-70 min-h-[44px]"
                         style={{ background: 'rgba(147,51,234,0.2)', border: '1px solid rgba(147,51,234,0.4)', color: '#c084fc' }}
                       >
-                        <Volume2 size={12} /> Áudio PT→EN
+                        <Volume2 size={14} /> Áudio PT→EN
                       </button>
                     </div>
                   </div>
