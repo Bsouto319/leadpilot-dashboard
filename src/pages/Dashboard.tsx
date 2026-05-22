@@ -651,8 +651,9 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
                 <Row label="Address"><span>{editAddress || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 <Row label="Service"><span className="capitalize">{editService?.replace(/_/g, ' ') || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 {lead.scheduled_at && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
-                {lead.source       && <Row label="Source"><span className="capitalize">{lead.source}</span></Row>}
-                <Row label="Received"><span>{new Date(lead.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>
+                {lead.source       && <Row label="Source"><span className="capitalize">{lead.source.replace(/_/g, ' ')}</span></Row>}
+                {lead.last_response_at && <Row label="Last activity"><span className="text-blue-600 font-semibold">{new Date(lead.last_response_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
+                <Row label="Received"><span className="text-gray-400">{new Date(lead.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>
               </>
             )}
           </div>

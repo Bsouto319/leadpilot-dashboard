@@ -9,6 +9,7 @@ interface Lead {
   scheduled_at?: string;
   lead_address?: string;
   created_at: string;
+  last_response_at?: string | null;
   score?: number | null;
   summary?: string | null;
 }
@@ -28,11 +29,12 @@ function minutesSince(d: string) {
 function formatEntryTime(d: string) {
   const date = new Date(d);
   const now  = new Date();
+  const hm   = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   const isToday = date.toDateString() === now.toDateString();
   const yesterday = new Date(now); yesterday.setDate(now.getDate() - 1);
   const isYest = date.toDateString() === yesterday.toDateString();
-  if (isToday) return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  if (isYest)  return 'Yesterday';
+  if (isToday) return `Today ${hm}`;
+  if (isYest)  return `Yesterday ${hm}`;
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
@@ -72,8 +74,9 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
               style={{ background: 'rgba(10,20,55,0.5)' }}
             >
               {items.map(lead => {
+                const lastActivity = lead.last_response_at || lead.created_at;
                 const isNew     = minutesSince(lead.created_at) < 60;
-                const idleHours = minutesSince(lead.created_at) / 60;
+                const idleHours = minutesSince(lastActivity) / 60;
                 const noReply   = !['scheduled', 'completed', 'no_show'].includes(lead.stage) && idleHours >= 3;
 
                 return (
@@ -139,7 +142,7 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                     {/* Bottom row: time + score */}
                     <div className="flex items-center justify-between mt-1">
                       <span className={`text-[10px] font-bold ${noReply ? 'text-red-400' : 'text-white/25'}`}>
-                        🕐 {formatEntryTime(lead.created_at)}
+                        🕐 {formatEntryTime(lead.last_response_at || lead.created_at)}
                       </span>
                       {lead.score != null && (
                         <span

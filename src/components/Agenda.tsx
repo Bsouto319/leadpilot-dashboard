@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Phone, MapPin, MessageSquare } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Phone, MessageSquare, MapPin, X } from 'lucide-react';
 
 interface Appointment {
   id: string;
@@ -17,29 +17,19 @@ interface Props {
   onSms?: (aptId: string, phone: string, leadName: string) => void;
 }
 
-const STAGE_COLOR: Record<string, string> = {
-  scheduled:        'bg-emerald-50 text-emerald-600 border-emerald-200',
-  awaiting_address: 'bg-amber-50 text-amber-600 border-amber-200',
-  completed:        'bg-violet-50 text-violet-600 border-violet-200',
-  no_show:          'bg-rose-50 text-rose-500 border-rose-200',
-};
-
-const STAGE_LABEL: Record<string, string> = {
-  scheduled:        'Confirmed',
-  awaiting_address: 'Pending address',
-  completed:        'Completed',
-  no_show:          'No show',
-};
-
-const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 
-function startOfWeek(date: Date) {
-  const d = new Date(date);
-  d.setDate(d.getDate() - d.getDay());
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
+const STAGE_STYLE: Record<string, { bg: string; text: string; dot: string }> = {
+  scheduled:        { bg: 'rgba(16,185,129,0.2)',  text: '#34d399', dot: '#10b981' },
+  awaiting_address: { bg: 'rgba(251,191,36,0.2)',  text: '#fbbf24', dot: '#f59e0b' },
+  completed:        { bg: 'rgba(139,92,246,0.2)',  text: '#a78bfa', dot: '#8b5cf6' },
+  no_show:          { bg: 'rgba(239,68,68,0.2)',   text: '#f87171', dot: '#ef4444' },
+};
+const STAGE_LABEL: Record<string, string> = {
+  scheduled: 'Confirmed', awaiting_address: 'Pending Address',
+  completed: 'Completed', no_show: 'No Show',
+};
 
 function sameDay(a: Date, b: Date) {
   return a.getFullYear() === b.getFullYear() &&
@@ -48,141 +38,231 @@ function sameDay(a: Date, b: Date) {
 }
 
 export default function Agenda({ appointments, onCall, onSms }: Props) {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date()));
-  const [selected, setSelected]   = useState<Date>(() => { const t = new Date(); t.setHours(0,0,0,0); return t; });
+  const today = new Date(); today.setHours(0,0,0,0);
+  const [viewDate, setViewDate]   = useState(() => new Date(today.getFullYear(), today.getMonth(), 1));
+  const [selected, setSelected]   = useState<Date | null>(null);
 
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart);
-    d.setDate(weekStart.getDate() + i);
-    return d;
-  });
+  const year  = viewDate.getFullYear();
+  const month = viewDate.getMonth();
 
-  const prevWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() - 7); setWeekStart(d); };
-  const nextWeek = () => { const d = new Date(weekStart); d.setDate(d.getDate() + 7); setWeekStart(d); };
-  const goToday  = () => { setWeekStart(startOfWeek(new Date())); setSelected((() => { const t = new Date(); t.setHours(0,0,0,0); return t; })()); };
+  const firstDay    = new Date(year, month, 1).getDay();   // weekday of 1st
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const daysInPrev  = new Date(year, month, 0).getDate();
+
+  // Build 6-week grid (42 cells)
+  const cells: { date: Date; inMonth: boolean }[] = [];
+  for (let i = 0; i < 42; i++) {
+    const offset = i - firstDay;
+    let d: Date;
+    let inMonth = true;
+    if (offset < 0) {
+      d = new Date(year, month - 1, daysInPrev + offset + 1);
+      inMonth = false;
+    } else if (offset >= daysInMonth) {
+      d = new Date(year, month + 1, offset - daysInMonth + 1);
+      inMonth = false;
+    } else {
+      d = new Date(year, month, offset + 1);
+    }
+    cells.push({ date: d, inMonth });
+  }
 
   const aptsForDay = (day: Date) =>
     appointments
       .filter(a => a.scheduled_at && sameDay(new Date(a.scheduled_at), day))
       .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime());
 
-  const selectedApts = aptsForDay(selected);
-  const today        = new Date(); today.setHours(0,0,0,0);
+  const selectedApts = selected ? aptsForDay(selected) : [];
 
-  const monthLabel = (() => {
-    const months = new Set(weekDays.map(d => d.getMonth()));
-    if (months.size === 1) return `${MONTHS[weekDays[0].getMonth()]} ${weekDays[0].getFullYear()}`;
-    return `${MONTHS[weekDays[0].getMonth()]} / ${MONTHS[weekDays[6].getMonth()]} ${weekDays[6].getFullYear()}`;
-  })();
+  const prevMonth = () => setViewDate(new Date(year, month - 1, 1));
+  const nextMonth = () => setViewDate(new Date(year, month + 1, 1));
+  const goToday   = () => { setViewDate(new Date(today.getFullYear(), today.getMonth(), 1)); setSelected(today); };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      {/* Header */}
-      <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <h2 className="font-semibold text-gray-900">{monthLabel}</h2>
-          <button onClick={goToday} className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition">
-            Today
-          </button>
-        </div>
-        <div className="flex items-center gap-1">
-          <button onClick={prevWeek} className="p-1.5 rounded-lg hover:bg-gray-100 transition"><ChevronLeft size={16} /></button>
-          <button onClick={nextWeek} className="p-1.5 rounded-lg hover:bg-gray-100 transition"><ChevronRight size={16} /></button>
-        </div>
-      </div>
+    <div className="flex flex-col gap-4">
 
-      {/* Week grid */}
-      <div className="grid grid-cols-7 border-b border-gray-100">
-        {weekDays.map((day, i) => {
-          const count    = aptsForDay(day).length;
-          const isToday  = sameDay(day, today);
-          const isSel    = sameDay(day, selected);
-          return (
+      {/* Calendar card */}
+      <div className="rounded-2xl overflow-hidden border border-white/10" style={{ background: 'rgba(10,20,60,0.85)' }}>
+
+        {/* Month header */}
+        <div className="px-5 py-4 flex items-center justify-between border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
+          <div className="flex items-center gap-3">
+            <h2 className="text-white font-black text-lg tracking-tight">
+              {MONTHS[month]} <span className="text-white/40 font-medium">{year}</span>
+            </h2>
             <button
-              key={i}
-              onClick={() => setSelected(day)}
-              className={`py-3 flex flex-col items-center gap-1 transition border-r last:border-r-0 border-gray-100
-                ${isSel ? 'bg-blue-50' : 'hover:bg-gray-50'}`}
+              onClick={goToday}
+              className="text-xs font-bold px-3 py-1 rounded-lg border border-white/15 text-white/60 hover:text-white hover:bg-white/10 transition"
             >
-              <span className="text-xs font-medium text-gray-400">{DAYS[day.getDay()]}</span>
-              <span className={`text-sm font-semibold w-7 h-7 flex items-center justify-center rounded-full
-                ${isToday ? 'bg-blue-600 text-white' : isSel ? 'text-blue-600' : 'text-gray-800'}`}>
-                {day.getDate()}
-              </span>
-              {count > 0 && (
-                <span className="text-xs font-medium px-1.5 py-0.5 rounded-full bg-green-100 text-green-700">
-                  {count}
-                </span>
-              )}
+              Today
             </button>
-          );
-        })}
-      </div>
-
-      {/* Selected day appointments */}
-      <div className="min-h-48">
-        <div className="px-5 py-3 border-b border-gray-50">
-          <p className="text-sm font-medium text-gray-500">
-            {selected.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-            {selectedApts.length > 0 && (
-              <span className="ml-2 text-blue-600 font-semibold">{selectedApts.length} appointment{selectedApts.length > 1 ? 's' : ''}</span>
-            )}
-          </p>
+          </div>
+          <div className="flex items-center gap-1">
+            <button onClick={prevMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition">
+              <ChevronLeft size={17} />
+            </button>
+            <button onClick={nextMonth} className="p-2 rounded-xl hover:bg-white/10 text-white/50 hover:text-white transition">
+              <ChevronRight size={17} />
+            </button>
+          </div>
         </div>
 
-        {selectedApts.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <p className="text-gray-400 text-sm">No appointments this day</p>
-          </div>
-        ) : (
-          <div className="divide-y divide-gray-50">
-            {selectedApts.map(apt => {
-              const time  = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-              const color = STAGE_COLOR[apt.stage] || 'bg-gray-100 text-gray-600 border-gray-200';
-              const label = STAGE_LABEL[apt.stage] || apt.stage;
-              return (
-                <div key={apt.id} className="px-5 py-4 flex items-start gap-4">
-                  {/* Time */}
-                  <div className="text-sm font-semibold text-blue-600 w-14 shrink-0 pt-0.5">{time}</div>
+        {/* Day-of-week headers */}
+        <div className="grid grid-cols-7 border-b border-white/10">
+          {DAYS.map(d => (
+            <div key={d} className="py-2 text-center text-[11px] font-black text-white/30 tracking-widest uppercase">
+              {d}
+            </div>
+          ))}
+        </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-semibold text-gray-900">{apt.lead_name || 'Customer'}</p>
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full border ${color}`}>{label}</span>
-                      {apt.service_type && (
-                        <span className="text-xs text-blue-600 capitalize">{apt.service_type.replace(/_/g, ' ')}</span>
+        {/* Month grid */}
+        <div className="grid grid-cols-7">
+          {cells.map(({ date, inMonth }, i) => {
+            const apts      = aptsForDay(date);
+            const isToday   = sameDay(date, today);
+            const isSel     = selected && sameDay(date, selected);
+            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+            const isLast    = i >= 35; // hide 6th row if all out-of-month
+
+            if (!inMonth && isLast && cells.slice(35).every(c => !c.inMonth)) return null;
+
+            return (
+              <button
+                key={i}
+                onClick={() => setSelected(date)}
+                className={`relative min-h-[72px] p-1.5 text-left border-r border-b border-white/5 transition-all last-of-row:border-r-0
+                  ${isSel       ? 'bg-blue-600/15 border-blue-500/30' : 'hover:bg-white/[0.04]'}
+                  ${!inMonth    ? 'opacity-35' : ''}
+                  ${isWeekend && inMonth ? 'bg-white/[0.015]' : ''}
+                `}
+              >
+                {/* Day number */}
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-sm font-black mb-1 transition-all
+                  ${isToday
+                    ? 'bg-gradient-to-br from-blue-400 to-indigo-600 text-white shadow-lg shadow-blue-500/40'
+                    : isSel
+                    ? 'text-blue-300'
+                    : inMonth
+                    ? 'text-white/80'
+                    : 'text-white/25'
+                  }
+                `}>
+                  {date.getDate()}
+                </span>
+
+                {/* Appointment chips — max 2 visible */}
+                <div className="flex flex-col gap-0.5">
+                  {apts.slice(0, 2).map(apt => {
+                    const s = STAGE_STYLE[apt.stage] || STAGE_STYLE.scheduled;
+                    const time = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    return (
+                      <div
+                        key={apt.id}
+                        className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold truncate"
+                        style={{ background: s.bg, color: s.text }}
+                      >
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: s.dot }} />
+                        <span className="truncate">{time} {apt.lead_name}</span>
+                      </div>
+                    );
+                  })}
+                  {apts.length > 2 && (
+                    <span className="text-[9px] font-black text-white/40 pl-1">+{apts.length - 2} more</span>
+                  )}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Selected day detail panel */}
+      {selected && (
+        <div className="rounded-2xl border border-white/10 overflow-hidden" style={{ background: 'rgba(10,20,60,0.85)' }}>
+          {/* Panel header */}
+          <div className="px-5 py-3 flex items-center justify-between border-b border-white/10" style={{ background: 'rgba(255,255,255,0.04)' }}>
+            <p className="text-sm font-black text-white">
+              {selected.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+              {selectedApts.length > 0 && (
+                <span className="ml-2 text-emerald-400">{selectedApts.length} appointment{selectedApts.length > 1 ? 's' : ''}</span>
+              )}
+            </p>
+            <button onClick={() => setSelected(null)} className="p-1 rounded-lg hover:bg-white/10 text-white/40 hover:text-white/80 transition">
+              <X size={14} />
+            </button>
+          </div>
+
+          {selectedApts.length === 0 ? (
+            <div className="py-12 text-center">
+              <p className="text-white/25 text-sm font-medium">No appointments scheduled</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-white/5">
+              {selectedApts.map(apt => {
+                const s     = STAGE_STYLE[apt.stage] || STAGE_STYLE.scheduled;
+                const label = STAGE_LABEL[apt.stage]  || apt.stage;
+                const time  = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                return (
+                  <div key={apt.id} className="px-5 py-4 flex items-center gap-4">
+                    {/* Time block */}
+                    <div className="shrink-0 text-center w-14">
+                      <p className="text-lg font-black text-white leading-none">{time.split(':')[0]}</p>
+                      <p className="text-sm font-bold text-white/40">:{time.split(':')[1]}</p>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="w-px h-12 rounded-full shrink-0" style={{ background: s.dot }} />
+
+                    {/* Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-sm font-black text-white">{apt.lead_name || 'Customer'}</p>
+                        <span
+                          className="text-[10px] font-black px-2 py-0.5 rounded-full"
+                          style={{ background: s.bg, color: s.text }}
+                        >
+                          {label}
+                        </span>
+                        {apt.service_type && apt.service_type !== 'general' && (
+                          <span className="text-[10px] font-semibold text-white/40 capitalize">
+                            {apt.service_type.replace(/_/g, ' ')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-white/40 font-medium mt-0.5">+{apt.lead_phone}</p>
+                      {apt.lead_address && (
+                        <div className="flex items-center gap-1 mt-1">
+                          <MapPin size={11} className="text-white/30 shrink-0" />
+                          <p className="text-xs text-white/40 truncate">{apt.lead_address}</p>
+                        </div>
                       )}
                     </div>
-                    {apt.lead_address && (
-                      <div className="flex items-center gap-1 mt-1">
-                        <MapPin size={12} className="text-gray-400 shrink-0" />
-                        <p className="text-xs text-gray-500 truncate">{apt.lead_address}</p>
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Actions */}
-                  <div className="flex gap-1.5 shrink-0">
-                    <button
-                      onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
-                      className="flex items-center gap-1 text-xs font-medium text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 px-2.5 py-1.5 rounded-lg transition touch-manipulation"
-                    >
-                      <Phone size={11} /> Call
-                    </button>
-                    <button
-                      onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
-                      className="flex items-center gap-1 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 px-2.5 py-1.5 rounded-lg transition touch-manipulation"
-                    >
-                      <MessageSquare size={11} /> SMS
-                    </button>
+                    {/* Actions */}
+                    <div className="flex gap-2 shrink-0">
+                      <button
+                        onClick={() => onCall ? onCall(`+${apt.lead_phone}`) : (window.location.href = `tel:+${apt.lead_phone}`)}
+                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition shadow-lg"
+                        style={{ background: 'linear-gradient(135deg, #3b82f6, #4f46e5)', boxShadow: '0 4px 12px rgba(59,130,246,0.35)' }}
+                      >
+                        <Phone size={12} /> Call
+                      </button>
+                      <button
+                        onClick={() => onSms?.(apt.id, apt.lead_phone, apt.lead_name || '')}
+                        className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl text-white transition"
+                        style={{ background: 'rgba(16,185,129,0.2)', border: '1px solid rgba(16,185,129,0.4)', color: '#34d399' }}
+                      >
+                        <MessageSquare size={12} /> SMS
+                      </button>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

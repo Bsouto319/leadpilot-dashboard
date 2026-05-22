@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight, Wifi } from 'lucide-react';
+import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight, Wifi, Mic, MicOff, Send, Loader } from 'lucide-react';
+
+const API = import.meta.env.VITE_API_URL as string;
+const KEY = import.meta.env.VITE_ADMIN_KEY as string;
 import { Device, Call } from '@twilio/voice-sdk';
 
 type Status = 'disconnected' | 'loading' | 'idle' | 'ringing' | 'active' | 'error';
@@ -29,6 +32,17 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
   const [callerNumber, setCallerNumber] = useState('');
   const deviceRef = useRef<Device | null>(null);
   const callRef   = useRef<Call | null>(null);
+
+  // Audio message state
+  const [audioRecording, setAudioRecording] = useState(false);
+  const [audioBlob, setAudioBlob]           = useState<Blob | null>(null);
+  const [audioUrl, setAudioUrl]             = useState<string | null>(null);
+  const [audioCallPhone, setAudioCallPhone] = useState('');
+  const [audioCallStatus, setAudioCallStatus] = useState<'idle' | 'recording' | 'processing' | 'done' | 'error'>('idle');
+  const [audioCallResult, setAudioCallResult] = useState<{ callSid: string; transcription: string; translation: string } | null>(null);
+  const [audioCallError, setAudioCallError]   = useState('');
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef   = useRef<BlobEvent['data'][]>([]);
 
   useEffect(() => {
     loadClient();
@@ -167,6 +181,64 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
     deviceRef.current?.disconnectAll();
     callRef.current = null;
     setStatus('idle');
+  }
+
+  async function startRecording() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' });
+      audioChunksRef.current = [];
+      mr.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      mr.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        setAudioUrl(URL.createObjectURL(blob));
+        setAudioRecording(false);
+        setAudioCallStatus('idle');
+      };
+      mediaRecorderRef.current = mr;
+      mr.start();
+      setAudioRecording(true);
+      setAudioCallStatus('recording');
+      setAudioBlob(null);
+      setAudioUrl(null);
+      setAudioCallResult(null);
+      setAudioCallError('');
+    } catch (e: any) {
+      setAudioCallError('Microfone não disponível: ' + e.message);
+    }
+  }
+
+  function stopRecording() {
+    mediaRecorderRef.current?.stop();
+  }
+
+  async function sendAudioCall() {
+    if (!audioBlob || !audioCallPhone || !clientId) return;
+    setAudioCallStatus('processing');
+    setAudioCallError('');
+    setAudioCallResult(null);
+    try {
+      const reader = new FileReader();
+      const base64 = await new Promise<string>((res, rej) => {
+        reader.onload = () => res((reader.result as string).split(',')[1]);
+        reader.onerror = rej;
+        reader.readAsDataURL(audioBlob);
+      });
+      const resp = await fetch(`${API}/api/admin/send-audio-call`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
+        body: JSON.stringify({ audioBase64: base64, audioMimetype: 'audio/webm', phone: audioCallPhone, clientId }),
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
+      setAudioCallResult({ callSid: data.callSid, transcription: data.transcription, translation: data.translation });
+      setAudioCallStatus('done');
+    } catch (e: any) {
+      setAudioCallError(e.message || 'Erro ao enviar');
+      setAudioCallStatus('error');
+    }
   }
 
   const busy = status === 'ringing' || status === 'active';
@@ -313,6 +385,75 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
         </div>
         {callSid && (
           <p className="text-xs opacity-50 mt-1 font-mono truncate">SID: {callSid}</p>
+        )}
+      </div>
+
+      {/* ── Mensagem de Voz ─────────────────────────────────────── */}
+      <div className="border-t border-gray-100 pt-4 space-y-3">
+        <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
+          <Mic size={11} /> Mensagem de Voz (PT/ES → EN)
+        </p>
+
+        {/* Número destino */}
+        <input
+          type="tel"
+          value={audioCallPhone}
+          onChange={e => setAudioCallPhone(e.target.value)}
+          placeholder="Número do cliente (+1...)"
+          inputMode="tel"
+          className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400 touch-manipulation"
+        />
+
+        {/* Gravar */}
+        <div className="flex gap-2">
+          {!audioRecording ? (
+            <button
+              onClick={startRecording}
+              disabled={audioCallStatus === 'processing'}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-purple-600 hover:bg-purple-700 active:bg-purple-800 text-white text-sm font-bold rounded-xl transition disabled:opacity-40 touch-manipulation"
+            >
+              <Mic size={14} /> {audioBlob ? 'Regravar' : 'Gravar áudio'}
+            </button>
+          ) : (
+            <button
+              onClick={stopRecording}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 active:bg-red-700 text-white text-sm font-bold rounded-xl transition touch-manipulation animate-pulse"
+            >
+              <MicOff size={14} /> Parar gravação
+            </button>
+          )}
+        </div>
+
+        {/* Preview player */}
+        {audioUrl && (
+          <audio controls src={audioUrl} className="w-full h-8 rounded-lg" />
+        )}
+
+        {/* Botão ligar com áudio */}
+        {audioBlob && !audioRecording && (
+          <button
+            onClick={sendAudioCall}
+            disabled={!audioCallPhone || audioCallStatus === 'processing'}
+            className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-40 touch-manipulation"
+          >
+            {audioCallStatus === 'processing'
+              ? <><Loader size={14} className="animate-spin" /> Processando…</>
+              : <><Send size={14} /> Ligar com esta mensagem</>
+            }
+          </button>
+        )}
+
+        {/* Resultado */}
+        {audioCallStatus === 'done' && audioCallResult && (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-3 space-y-1">
+            <p className="text-xs font-bold text-green-700">Ligação realizada!</p>
+            <p className="text-xs text-green-600 font-mono truncate">SID: {audioCallResult.callSid}</p>
+            <p className="text-xs text-gray-600"><span className="font-semibold">Transcrito:</span> {audioCallResult.transcription}</p>
+            <p className="text-xs text-gray-600"><span className="font-semibold">Traduzido:</span> {audioCallResult.translation}</p>
+          </div>
+        )}
+        {audioCallStatus === 'error' && audioCallError && (
+          <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{audioCallError}</p>
         )}
       </div>
     </div>
