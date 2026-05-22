@@ -86,3 +86,27 @@ export async function deleteLead(id: string) {
 export function exportLeadsUrl(clientId: string) {
   return `${API}/api/admin/leads/export/csv?clientId=${clientId}&x-admin-key=${KEY}`;
 }
+
+// ── Messages (thread + media) ─────────────────────────────────────────────────
+
+export async function fetchMessages(leadId: string): Promise<{ id: string; role: string; body: string; media_url?: string; created_at: string }[]> {
+  try {
+    const r = await fetch(`${API}/api/admin/leads/${leadId}/messages`, {
+      headers: { 'x-admin-key': KEY },
+    });
+    if (!r.ok) return [];
+    return await r.json();
+  } catch { return []; }
+}
+
+export async function sendLeadEmail(leadId: string, subject: string, message: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await fetch(`${API}/api/admin/leads/${leadId}/send-email`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
+      body: JSON.stringify({ subject, message }),
+    });
+    const data = await r.json();
+    return r.ok ? { ok: true } : { ok: false, error: data.error };
+  } catch (e: any) { return { ok: false, error: e.message }; }
+}

@@ -3,10 +3,9 @@ import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
   LogOut, ArrowLeft,
-  KeyRound, HeadphonesIcon,
+  KeyRound, HeadphonesIcon, Mail, Image,
 } from 'lucide-react';
-import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl } from '../lib/api';
-import Contacts from '../components/Contacts';
+import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
@@ -34,7 +33,7 @@ function daysSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
 }
 
-type ViewType = 'pipeline' | 'list' | 'contacts' | 'agenda' | 'followups' | 'dialpad' | 'settings';
+type ViewType = 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings';
 
 export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
   const [view, setView]                 = useState<ViewType>('pipeline');
@@ -51,6 +50,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [toast, setToast]               = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
   const [dialpadPhone, setDialpadPhone] = useState('');
   const [smsModal, setSmsModal]         = useState<{ leadId: string; phone: string; leadName: string } | null>(null);
+  const [emailModal, setEmailModal]     = useState<{ leadId: string; leadName: string } | null>(null);
   const [newLeadAlert, setNewLeadAlert] = useState(false);
 
   const viewRef = useRef(view);
@@ -161,6 +161,11 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     setSmsModal({ leadId, phone, leadName });
   }
 
+  function handleEmail(leadId: string, leadName: string) {
+    setSelectedLead(null);
+    setEmailModal({ leadId, leadName });
+  }
+
   const urgentCount = leads.filter(l =>
     ['new_lead', 'ai_responded'].includes(l.stage) &&
     daysSince(l.created_at) >= 2 && !l.followup_d3_sent_at
@@ -180,7 +185,6 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const navTabs: { key: ViewType; label: string; badge?: number; alert?: boolean }[] = [
     { key: 'pipeline',  label: 'Pipeline', alert: newLeadAlert },
     { key: 'list',      label: 'Leads'      },
-    { key: 'contacts',  label: 'Contacts'   },
     { key: 'agenda',    label: 'Agenda'     },
     { key: 'followups', label: 'Follow-ups', badge: urgentCount },
     { key: 'dialpad',   label: '📞 Call'    },
@@ -336,12 +340,6 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           </div>
         )}
 
-        {view === 'contacts' && (
-          <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
-            <Contacts leads={leads} stages={STAGES} />
-          </div>
-        )}
-
         {view === 'agenda' && (
           <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
             <Agenda
@@ -383,6 +381,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           showToast={showToast}
           onCall={handleCall}
           onSms={(id, phone) => handleSms(id, phone, selectedLead?.lead_name || '')}
+          onEmail={(id) => handleEmail(id, selectedLead?.lead_name || '')}
           onDelete={handleDelete}
         />
       )}
@@ -394,6 +393,16 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           phone={smsModal.phone}
           leadName={smsModal.leadName}
           onClose={() => setSmsModal(null)}
+          showToast={showToast}
+        />
+      )}
+
+      {/* ── EMAIL MODAL ── */}
+      {emailModal && (
+        <EmailModal
+          leadId={emailModal.leadId}
+          leadName={emailModal.leadName}
+          onClose={() => setEmailModal(null)}
           showToast={showToast}
         />
       )}
@@ -542,10 +551,11 @@ interface ModalProps {
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
+  onEmail?: (leadId: string) => void;
   onDelete?: (leadId: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onDelete }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onEmail, onDelete }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -553,6 +563,15 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
   const [editAddress, setEditAddress]   = useState(lead.lead_address || '');
   const [editService, setEditService]   = useState(lead.service_type || '');
   const [editMode, setEditMode]         = useState(false);
+  const [photos, setPhotos]             = useState<string[]>([]);
+  const [lightbox, setLightbox]         = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchMessages(lead.id).then(msgs => {
+      const urls = msgs.filter(m => m.media_url).map(m => m.media_url as string);
+      setPhotos(urls);
+    });
+  }, [lead.id]);
   const stage   = stages.find(s => s.key === currentStage);
   const phone   = lead.lead_phone;
   const initials = (editName || 'C')[0].toUpperCase();
@@ -584,6 +603,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
   const inp = 'mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
 
   return (
+    <>
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
       <div
         className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto"
@@ -609,18 +629,24 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg leading-none transition shrink-0">×</button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-3 gap-2">
             <button
               onClick={() => onCall?.(`+${phone}`)}
-              className="flex items-center justify-center gap-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-4 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
+              className="flex items-center justify-center gap-1.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 px-3 py-3 rounded-xl transition shadow-sm shadow-blue-500/25"
             >
-              <PhoneCall size={15} /> Call
+              <PhoneCall size={14} /> Call
             </button>
             <button
               onClick={() => onSms?.(lead.id, phone)}
-              className="flex items-center justify-center gap-2 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-4 py-3 rounded-xl transition border border-emerald-200"
+              className="flex items-center justify-center gap-1.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-3 rounded-xl transition border border-emerald-200"
             >
-              <MessageSquare size={15} /> SMS
+              <MessageSquare size={14} /> SMS
+            </button>
+            <button
+              onClick={() => onEmail?.(lead.id)}
+              className="flex items-center justify-center gap-1.5 text-sm font-semibold text-violet-700 bg-violet-50 hover:bg-violet-100 px-3 py-3 rounded-xl transition border border-violet-200"
+            >
+              <Mail size={14} /> Email
             </button>
           </div>
 
@@ -703,6 +729,21 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             </button>
           </div>
 
+          {photos.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                <Image size={11} /> Photos from lead ({photos.length})
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {photos.map((url, i) => (
+                  <button key={i} onClick={() => setLightbox(url)} className="aspect-square rounded-xl overflow-hidden border border-gray-200 hover:border-blue-400 transition">
+                    <img src={url} alt="" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {onDelete && (
             <button
               onClick={() => { if (window.confirm('Delete this lead? This cannot be undone.')) { onDelete(lead.id); onClose(); } }}
@@ -714,6 +755,14 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
         </div>
       </div>
     </div>
+
+    {lightbox && (
+      <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4" onClick={() => setLightbox(null)}>
+        <img src={lightbox} alt="" className="max-w-full max-h-full rounded-2xl shadow-2xl" onClick={e => e.stopPropagation()} />
+        <button className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/20 hover:bg-white/30 text-white text-xl flex items-center justify-center" onClick={() => setLightbox(null)}>×</button>
+      </div>
+    )}
+    </>
   );
 }
 
@@ -780,6 +829,74 @@ function SmsModal({ leadId, phone, leadName, onClose, showToast }: SmsModalProps
             className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-emerald-500/25 disabled:opacity-40"
           >
             <MessageSquare size={14} /> {sending ? 'Sending…' : 'Send SMS'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── EMAIL MODAL ────────────────────────────────────────────────────────────────
+
+interface EmailModalProps {
+  leadId: string; leadName: string;
+  onClose: () => void;
+  showToast: (msg: string, type?: 'success' | 'error') => void;
+}
+
+function EmailModal({ leadId, leadName, onClose, showToast }: EmailModalProps) {
+  const [subject, setSubject] = useState('');
+  const [text, setText]       = useState('');
+  const [sending, setSending] = useState(false);
+
+  async function send() {
+    if (!text.trim()) return;
+    setSending(true);
+    const { ok, error } = await sendLeadEmail(leadId, subject.trim(), text.trim());
+    if (ok) {
+      showToast('Email sent!');
+      onClose();
+    } else {
+      showToast(error || 'Failed to send email', 'error');
+      setSending(false);
+    }
+  }
+
+  const inp = 'w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 resize-none';
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4" onClick={onClose}>
+      <div className="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl shadow-2xl p-5 sm:p-6 space-y-4" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-gray-900 flex items-center gap-2"><Mail size={16} className="text-violet-500" /> Send Email</h3>
+            <p className="text-xs text-gray-400 mt-0.5">To: {leadName || 'Lead'}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg transition">×</button>
+        </div>
+        <input
+          value={subject}
+          onChange={e => setSubject(e.target.value)}
+          placeholder="Subject (optional)"
+          className={inp.replace('resize-none', '')}
+        />
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && e.metaKey) send(); }}
+          rows={5}
+          placeholder="Write your message…"
+          autoFocus
+          className={inp}
+        />
+        <div className="flex gap-2">
+          <button onClick={onClose} className="flex-1 py-3 border border-gray-200 text-gray-500 text-sm font-semibold rounded-xl hover:bg-gray-50 transition">Cancel</button>
+          <button
+            onClick={send}
+            disabled={sending || !text.trim()}
+            className="flex-1 flex items-center justify-center gap-2 py-3 bg-violet-600 hover:bg-violet-700 text-white text-sm font-bold rounded-xl transition shadow-md shadow-violet-500/25 disabled:opacity-40"
+          >
+            <Mail size={14} /> {sending ? 'Sending…' : 'Send Email'}
           </button>
         </div>
       </div>
