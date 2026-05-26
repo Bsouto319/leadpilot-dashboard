@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { supabase } from './lib/supabase';
 import Login, { ResetPassword } from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -42,45 +43,72 @@ export default function App() {
   }
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-    </div>
+    <>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+      <Analytics />
+    </>
   );
 
-  if (isRecovery) return <ResetPassword onDone={() => { setIsRecovery(false); supabase.auth.signOut(); }} />;
+  if (isRecovery) return (
+    <>
+      <ResetPassword onDone={() => { setIsRecovery(false); supabase.auth.signOut(); }} />
+      <Analytics />
+    </>
+  );
 
-  if (!session) return <Login />;
+  if (!session) return (
+    <>
+      <Login />
+      <Analytics />
+    </>
+  );
 
   const isAdmin = session.user.email === ADMIN_EMAIL;
 
   if (isAdmin) {
     if (viewAsClient) {
       return (
-        <Dashboard
-          clientId={viewAsClient.id}
-          businessName={viewAsClient.business_name}
-          userEmail={session.user.email}
-          onBack={() => setViewAsClient(null)}
-        />
+        <>
+          <Dashboard
+            clientId={viewAsClient.id}
+            businessName={viewAsClient.business_name}
+            userEmail={session.user.email}
+            onBack={() => setViewAsClient(null)}
+          />
+          <Analytics />
+        </>
       );
     }
-    return <AdminPanel onViewClient={setViewAsClient} />;
+    return (
+      <>
+        <AdminPanel onViewClient={setViewAsClient} />
+        <Analytics />
+      </>
+    );
   }
 
   if (!client) return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 text-center p-4">
-      <div>
-        <p className="text-gray-500 text-sm">Account not linked to a contractor.</p>
-        <button onClick={() => supabase.auth.signOut()} className="mt-3 text-xs text-red-500 hover:underline">Sign out</button>
+    <>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-center p-4">
+        <div>
+          <p className="text-gray-500 text-sm">Account not linked to a contractor.</p>
+          <button onClick={() => supabase.auth.signOut()} className="mt-3 text-xs text-red-500 hover:underline">Sign out</button>
+        </div>
       </div>
-    </div>
+      <Analytics />
+    </>
   );
 
   return (
-    <Dashboard
-      clientId={client.id}
-      businessName={client.business_name}
-      userEmail={session.user.email}
-    />
+    <>
+      <Dashboard
+        clientId={client.id}
+        businessName={client.business_name}
+        userEmail={session.user.email}
+      />
+      <Analytics />
+    </>
   );
 }
