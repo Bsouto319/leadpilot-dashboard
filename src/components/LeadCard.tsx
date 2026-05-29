@@ -52,6 +52,8 @@ export default function LeadCard({ lead, stages, onClick, onCall, onSms, onDelet
           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
             <p className="text-xs text-gray-400 font-medium">+{lead.lead_phone}</p>
             {lead.service_type && <p className="text-xs text-blue-600 font-medium capitalize">{lead.service_type.replace(/_/g, ' ')}</p>}
+            {lead.source === 'website'   && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-purple-100 text-purple-700">🌐 Website</span>}
+            {lead.source === 'thumbtack' && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">📌 Thumbtack</span>}
           </div>
         </div>
 
