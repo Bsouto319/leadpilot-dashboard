@@ -1,7 +1,7 @@
 {
-  "name": "LeadPilot — Denali",
+  "name": "LeadPilot",
   "short_name": "LeadPilot",
-  "description": "Lead management dashboard for Denali Custom Homes",
+  "description": "Lead management dashboard",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0e1f4a",

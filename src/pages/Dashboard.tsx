@@ -130,7 +130,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     showToast('Notes saved');
   }
 
-  async function handleContactSave(leadId: string, data: { lead_name?: string; lead_address?: string; service_type?: string }) {
+  async function handleContactSave(leadId: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string }) {
     const { ok } = await updateLead(leadId, data);
     if (ok) {
       showToast('Contact info saved');
@@ -599,7 +599,7 @@ interface ModalProps {
   onClose: () => void;
   onStageChange: (id: string, stage: string) => void;
   onNotesSave: (id: string, notes: string) => void;
-  onContactSave: (id: string, data: { lead_name?: string; lead_address?: string; service_type?: string }) => void;
+  onContactSave: (id: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string }) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
@@ -615,6 +615,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
   const [editName, setEditName]         = useState(lead.lead_name || '');
   const [editAddress, setEditAddress]   = useState(lead.lead_address || '');
   const [editService, setEditService]   = useState(lead.service_type || '');
+  const [editEmail, setEditEmail]       = useState(lead.lead_email || '');
   const [editMode, setEditMode]         = useState(false);
   const [photos, setPhotos]             = useState<string[]>([]);
   const [lightbox, setLightbox]         = useState<string | null>(null);
@@ -648,6 +649,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
       lead_name:    editName.trim()    || undefined,
       lead_address: editAddress.trim() || undefined,
       service_type: editService.trim() || undefined,
+      lead_email:   editEmail.trim()   || undefined,
     });
     setEditMode(false);
     setSaving(false);
@@ -723,6 +725,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
             {editMode ? (
               <div className="space-y-2">
                 <div><label className="text-xs text-gray-400 font-medium">Name</label><input value={editName} onChange={e => setEditName(e.target.value)} placeholder="Customer name" className={inp} /></div>
+                <div><label className="text-xs text-gray-400 font-medium">Email</label><input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="customer@email.com" className={inp} /></div>
                 <div><label className="text-xs text-gray-400 font-medium">Address</label><input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Street, city, state" className={inp} /></div>
                 <div><label className="text-xs text-gray-400 font-medium">Service</label><input value={editService} onChange={e => setEditService(e.target.value)} placeholder="e.g. tile installation" className={inp} /></div>
                 <button onClick={saveContactInfo} disabled={saving} className="w-full text-sm font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-40">
@@ -733,6 +736,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
               <>
                 <Row label="Phone"><span className="font-semibold text-gray-900">+{phone}</span></Row>
                 <Row label="Name"><span className="font-medium text-gray-700">{editName || <span className="text-gray-300 italic">not set</span>}</span></Row>
+                <Row label="Email"><span className="text-blue-600">{editEmail || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 <Row label="Address"><span>{editAddress || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 <Row label="Service"><span className="capitalize">{editService?.replace(/_/g, ' ') || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 {lead.scheduled_at && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}

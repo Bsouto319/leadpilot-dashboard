@@ -4,8 +4,6 @@ import Login, { ResetPassword } from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
 
-const ADMIN_EMAIL = 'brunosouto1108@gmail.com';
-
 export default function App() {
   const [session, setSession]             = useState<any>(null);
   const [client, setClient]               = useState<any>(null);
@@ -16,7 +14,7 @@ export default function App() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      if (data.session) loadClient(data.session.user.id, data.session.user.email);
+      if (data.session) loadClient(data.session.user);
       else setLoading(false);
     });
 
@@ -28,15 +26,17 @@ export default function App() {
         return;
       }
       setSession(s);
-      if (s) loadClient(s.user.id, s.user.email);
+      if (s) loadClient(s.user);
       else { setClient(null); setViewAsClient(null); setLoading(false); }
     });
     return () => subscription.unsubscribe();
   }, []);
 
-  async function loadClient(userId: string, email?: string | null) {
-    if (email === ADMIN_EMAIL) { setLoading(false); return; }
-    const { data } = await supabase.from('clients').select('id, business_name').eq('user_id', userId).single();
+  async function loadClient(user: any) {
+    // role=admin is set server-side via Supabase service role on app_metadata
+    // — it is part of the signed JWT and cannot be forged by the browser
+    if (user.app_metadata?.role === 'admin') { setLoading(false); return; }
+    const { data } = await supabase.from('clients').select('id, business_name').eq('user_id', user.id).single();
     setClient(data);
     setLoading(false);
   }
@@ -51,7 +51,7 @@ export default function App() {
 
   if (!session) return <Login />;
 
-  const isAdmin = session.user.email === ADMIN_EMAIL;
+  const isAdmin = session.user.app_metadata?.role === 'admin';
 
   if (isAdmin) {
     if (viewAsClient) {

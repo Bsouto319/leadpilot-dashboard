@@ -68,7 +68,7 @@ export async function fetchLead(id: string) {
 
 export async function updateLead(id: string, data: {
   stage?: string; notes?: string; scheduled_at?: string;
-  lead_name?: string; lead_address?: string; service_type?: string;
+  lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string;
 }) {
   const { error } = await supabase.from('conversations').update(data).eq('id', id);
   if (error) console.error('updateLead', error.message);
