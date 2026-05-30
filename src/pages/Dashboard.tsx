@@ -5,7 +5,7 @@ import {
   LogOut, ArrowLeft, Settings,
   KeyRound, HeadphonesIcon, Mail, Image, Volume2,
 } from 'lucide-react';
-import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail } from '../lib/api';
+import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail, sendCatalogEmail } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import LeadCard from '../components/LeadCard';
 import Pipeline from '../components/Pipeline';
@@ -19,6 +19,7 @@ export const STAGES = [
   { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-400/15 text-sky-300',         headerBg: '#0284c7', cardBorder: '#38bdf8' },
   { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-400/15 text-amber-300',     headerBg: '#d97706', cardBorder: '#fbbf24' },
   { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-400/15 text-emerald-300', headerBg: '#059669', cardBorder: '#34d399' },
+  { key: 'visited',          label: 'Visited',          color: 'bg-purple-400/15 text-purple-300',   headerBg: '#7c3aed', cardBorder: '#a78bfa' },
   { key: 'completed',        label: 'Completed',        color: 'bg-teal-400/15 text-teal-300',       headerBg: '#0d9488', cardBorder: '#2dd4bf' },
   { key: 'no_show',          label: 'No Show',          color: 'bg-rose-400/15 text-rose-300',       headerBg: '#dc2626', cardBorder: '#f87171' },
 ];
@@ -30,9 +31,6 @@ interface Props {
   onBack?: () => void;
 }
 
-function daysSince(d: string) {
-  return Math.floor((Date.now() - new Date(d).getTime()) / 86400000);
-}
 
 type ViewType = 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings';
 
@@ -102,10 +100,20 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'conversations',
         filter: `client_id=eq.${clientId}`,
-      }, () => {
+      }, (payload: any) => {
         playNewLeadSound();
         if (viewRef.current !== 'pipeline') setNewLeadAlert(true);
         load();
+        const leadName = payload?.new?.lead_name || 'New lead';
+        if (typeof Notification !== 'undefined') {
+          if (Notification.permission === 'granted') {
+            new Notification('New Lead!', { body: `${leadName} just came in.`, icon: '/favicon.ico' });
+          } else if (Notification.permission !== 'denied') {
+            Notification.requestPermission().then(p => {
+              if (p === 'granted') new Notification('New Lead!', { body: `${leadName} just came in.`, icon: '/favicon.ico' });
+            });
+          }
+        }
       })
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'conversations',
@@ -132,7 +140,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     showToast('Notes saved');
   }
 
-  async function handleContactSave(leadId: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string }) {
+  async function handleContactSave(leadId: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string; scheduled_at?: string }) {
     const { ok } = await updateLead(leadId, data);
     if (ok) {
       showToast('Contact info saved');
@@ -189,7 +197,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
   const urgentCount = leads.filter(l =>
     ['new_lead', 'ai_responded'].includes(l.stage) &&
-    daysSince(l.created_at) >= 2 && !l.followup_d3_sent_at
+    l.lead_email && (!l.follow_up_count || l.follow_up_count === 0)
   ).length;
 
   const conversion = stats?.leadsWeek > 0
@@ -619,7 +627,7 @@ interface ModalProps {
   onClose: () => void;
   onStageChange: (id: string, stage: string) => void;
   onNotesSave: (id: string, notes: string) => void;
-  onContactSave: (id: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string }) => void;
+  onContactSave: (id: string, data: { lead_name?: string; lead_address?: string; service_type?: string; lead_email?: string; scheduled_at?: string }) => void;
   showToast: (msg: string, type?: 'success' | 'error') => void;
   onCall?: (phone: string) => void;
   onSms?: (leadId: string, phone: string) => void;
@@ -628,7 +636,7 @@ interface ModalProps {
   onDelete?: (leadId: string) => void;
 }
 
-function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, onCall, onSms, onEmail, onAudioCall, onDelete }: ModalProps) {
+function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContactSave, showToast, onCall, onSms, onEmail, onAudioCall, onDelete }: ModalProps) {
   const [notes, setNotes]               = useState(lead.notes || '');
   const [saving, setSaving]             = useState(false);
   const [currentStage, setCurrentStage] = useState(lead.stage);
@@ -637,6 +645,8 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
   const [editService, setEditService]   = useState(lead.service_type || '');
   const [editEmail, setEditEmail]       = useState(lead.lead_email || '');
   const [editMode, setEditMode]         = useState(false);
+  const [scheduledAt, setScheduledAt]   = useState(lead.scheduled_at ? new Date(lead.scheduled_at).toISOString().slice(0, 16) : '');
+  const [catalogSending, setCatalogSending] = useState(false);
   const [photos, setPhotos]             = useState<string[]>([]);
   const [lightbox, setLightbox]         = useState<string | null>(null);
 
@@ -670,9 +680,19 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
       lead_address: editAddress.trim() || undefined,
       service_type: editService.trim() || undefined,
       lead_email:   editEmail.trim()   || undefined,
+      scheduled_at: scheduledAt ? new Date(scheduledAt).toISOString() : undefined,
     });
     setEditMode(false);
     setSaving(false);
+  }
+
+  async function sendCatalog() {
+    if (!lead.lead_email && !editEmail.trim()) { showToast?.('Lead has no email address', 'error'); return; }
+    setCatalogSending(true);
+    const { ok, error } = await sendCatalogEmail(lead.id);
+    if (ok) showToast?.('Catalog email sent!');
+    else showToast?.(error || 'Failed to send catalog', 'error');
+    setCatalogSending(false);
   }
 
   const inp = 'mt-0.5 w-full px-3 py-2 bg-white border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -730,6 +750,15 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
               <Volume2 size={14} /> Áudio PT→EN
             </button>
           </div>
+          {(lead.lead_email || editEmail) && (
+            <button
+              onClick={sendCatalog}
+              disabled={catalogSending}
+              className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 px-3 py-2.5 rounded-xl transition border border-amber-200 disabled:opacity-40"
+            >
+              <Mail size={14} /> {catalogSending ? 'Sending catalog…' : 'Send Catalog Email'}
+            </button>
+          )}
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-3 text-sm">
             <div className="flex items-center justify-between">
@@ -748,6 +777,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
                 <div><label className="text-xs text-gray-400 font-medium">Email</label><input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} placeholder="customer@email.com" className={inp} /></div>
                 <div><label className="text-xs text-gray-400 font-medium">Address</label><input value={editAddress} onChange={e => setEditAddress(e.target.value)} placeholder="Street, city, state" className={inp} /></div>
                 <div><label className="text-xs text-gray-400 font-medium">Service</label><input value={editService} onChange={e => setEditService(e.target.value)} placeholder="e.g. tile installation" className={inp} /></div>
+                <div><label className="text-xs text-gray-400 font-medium">Schedule appointment</label><input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className={inp + ' [color-scheme:light]'} /></div>
                 <button onClick={saveContactInfo} disabled={saving} className="w-full text-sm font-semibold px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-40">
                   {saving ? 'Saving…' : 'Save Contact Info'}
                 </button>

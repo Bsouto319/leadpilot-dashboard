@@ -101,6 +101,17 @@ export async function fetchMessages(leadId: string): Promise<{ id: string; role:
   } catch { return []; }
 }
 
+export async function sendCatalogEmail(leadId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const r = await fetch(`${API}/api/admin/leads/${leadId}/send-catalog`, {
+      method: 'POST',
+      headers: { 'x-admin-key': KEY },
+    });
+    const data = await r.json();
+    return r.ok ? { ok: true } : { ok: false, error: data.error };
+  } catch (e: any) { return { ok: false, error: e.message }; }
+}
+
 export async function sendLeadEmail(leadId: string, subject: string, message: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const r = await fetch(`${API}/api/admin/leads/${leadId}/send-email`, {
