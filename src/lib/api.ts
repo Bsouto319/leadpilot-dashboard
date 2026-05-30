@@ -5,7 +5,7 @@ const KEY = import.meta.env.VITE_ADMIN_KEY as string;
 
 // ── Reads: direct Supabase (no API dependency) ────────────────────────────────
 
-export async function fetchLeads(params: { page?: number; search?: string; stage?: string; clientId: string; limit?: number }) {
+export async function fetchLeads(params: { page?: number; search?: string; stage?: string; clientId: string; limit?: number; dateFrom?: string; dateTo?: string }) {
   const limit = params.limit || 200;
   const from  = ((params.page || 1) - 1) * limit;
 
@@ -16,8 +16,10 @@ export async function fetchLeads(params: { page?: number; search?: string; stage
     .order('created_at', { ascending: false })
     .range(from, from + limit - 1);
 
-  if (params.stage)  query = query.eq('stage', params.stage);
-  if (params.search) query = query.or(`lead_name.ilike.%${params.search}%,lead_phone.ilike.%${params.search}%`);
+  if (params.stage)    query = query.eq('stage', params.stage);
+  if (params.search)   query = query.or(`lead_name.ilike.%${params.search}%,lead_phone.ilike.%${params.search}%`);
+  if (params.dateFrom) query = query.gte('created_at', params.dateFrom);
+  if (params.dateTo)   query = query.lte('created_at', params.dateTo + 'T23:59:59.999Z');
 
   const { data, count, error } = await query;
   if (error) console.error('fetchLeads', error.message);

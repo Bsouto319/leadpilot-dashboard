@@ -43,6 +43,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [appointments, setAppointments] = useState<any[]>([]);
   const [stageFilter, setStageFilter]   = useState('');
   const [search, setSearch]             = useState('');
+  const [dateFrom, setDateFrom]         = useState('');
+  const [dateTo, setDateTo]             = useState('');
   const [page, setPage]                 = useState(1);
   const [total, setTotal]               = useState(0);
   const [loading, setLoading]           = useState(true);
@@ -81,7 +83,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const load = useCallback(async () => {
     const [s, l, a] = await Promise.all([
       fetchStats(clientId),
-      fetchLeads({ clientId, page, search, stage: stageFilter }),
+      fetchLeads({ clientId, page, search, stage: stageFilter, dateFrom: dateFrom || undefined, dateTo: dateTo || undefined }),
       fetchAppointments(clientId),
     ]);
     setStats(s);
@@ -90,7 +92,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     setAppointments(a);
     setLoading(false);
     setRefreshing(false);
-  }, [clientId, page, search, stageFilter]);
+  }, [clientId, page, search, stageFilter, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -172,6 +174,18 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     setSelectedLead(null);
     setAudioCallModal({ phone, leadName });
   }
+
+  function applyPreset(preset: 'today' | '7d' | '30d' | 'all') {
+    const now = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    if (preset === 'today') { setDateFrom(fmt(now)); setDateTo(fmt(now)); }
+    else if (preset === '7d')  { const d = new Date(now); d.setDate(d.getDate() - 6);  setDateFrom(fmt(d)); setDateTo(fmt(now)); }
+    else if (preset === '30d') { const d = new Date(now); d.setDate(d.getDate() - 29); setDateFrom(fmt(d)); setDateTo(fmt(now)); }
+    else { setDateFrom(''); setDateTo(''); }
+    setPage(1);
+  }
+
+  const hasDateFilter = dateFrom || dateTo;
 
   const urgentCount = leads.filter(l =>
     ['new_lead', 'ai_responded'].includes(l.stage) &&
@@ -290,8 +304,12 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
       <main className="flex-1 overflow-hidden min-h-0">
 
         {view === 'pipeline' && (
-          <div className="h-full px-4 sm:px-6 pb-6">
-            <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
+          <div className="h-full flex flex-col px-4 sm:px-6 pb-6 gap-2">
+            <PeriodBar dateFrom={dateFrom} dateTo={dateTo} hasFilter={!!hasDateFilter}
+              onPreset={applyPreset} onFrom={v => { setDateFrom(v); setPage(1); }} onTo={v => { setDateTo(v); setPage(1); }} />
+            <div className="flex-1 min-h-0">
+              <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
+            </div>
           </div>
         )}
 
@@ -313,6 +331,8 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                   <option value="">All Stages</option>
                   {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
+                <PeriodBar dateFrom={dateFrom} dateTo={dateTo} hasFilter={!!hasDateFilter}
+                  onPreset={applyPreset} onFrom={v => { setDateFrom(v); setPage(1); }} onTo={v => { setDateTo(v); setPage(1); }} />
               </div>
               <div className="divide-y divide-white/5">
                 {leads.map(lead => (
@@ -962,6 +982,49 @@ function EmailModal({ leadId, leadName, onClose, showToast }: EmailModalProps) {
             <Mail size={14} /> {sending ? 'Sending…' : 'Send Email'}
           </button>
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ── PERIOD FILTER BAR ──────────────────────────────────────────────────────────
+
+interface PeriodBarProps {
+  dateFrom: string; dateTo: string; hasFilter: boolean;
+  onPreset: (p: 'today' | '7d' | '30d' | 'all') => void;
+  onFrom: (v: string) => void;
+  onTo: (v: string) => void;
+}
+
+function PeriodBar({ dateFrom, dateTo, hasFilter, onPreset, onFrom, onTo }: PeriodBarProps) {
+  const btnBase = 'px-2.5 py-1 rounded-lg text-xs font-bold transition whitespace-nowrap';
+  const btnActive = 'bg-blue-500/30 text-blue-200 border border-blue-500/40';
+  const btnIdle   = 'text-white/40 hover:text-white/70 hover:bg-white/5 border border-white/10';
+  const dateInp   = 'px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs text-white/70 focus:outline-none focus:ring-1 focus:ring-blue-500/50 [color-scheme:dark]';
+
+  const isPreset = (preset: string) => {
+    const now = new Date();
+    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const today = fmt(now);
+    if (preset === 'today') return dateFrom === today && dateTo === today;
+    if (preset === '7d')  { const d = new Date(now); d.setDate(d.getDate() - 6); return dateFrom === fmt(d) && dateTo === today; }
+    if (preset === '30d') { const d = new Date(now); d.setDate(d.getDate() - 29); return dateFrom === fmt(d) && dateTo === today; }
+    if (preset === 'all') return !dateFrom && !dateTo;
+    return false;
+  };
+
+  return (
+    <div className="flex items-center gap-2 flex-wrap">
+      {hasFilter && <span className="text-[9px] font-black text-blue-300/60 uppercase tracking-widest">Period:</span>}
+      {(['all', 'today', '7d', '30d'] as const).map(p => (
+        <button key={p} onClick={() => onPreset(p)} className={`${btnBase} ${isPreset(p) ? btnActive : btnIdle}`}>
+          {p === 'all' ? 'All Time' : p === 'today' ? 'Today' : p === '7d' ? '7 days' : '30 days'}
+        </button>
+      ))}
+      <div className="flex items-center gap-1">
+        <input type="date" value={dateFrom} onChange={e => onFrom(e.target.value)} className={dateInp} />
+        <span className="text-white/20 text-xs">–</span>
+        <input type="date" value={dateTo} onChange={e => onTo(e.target.value)} className={dateInp} />
       </div>
     </div>
   );
