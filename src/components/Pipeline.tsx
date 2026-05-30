@@ -22,6 +22,34 @@ interface Stage {
   cardBorder: string;
 }
 
+const SOURCE_CONFIG: Record<string, { label: string; icon: string; bg: string; color: string; border: string }> = {
+  website:       { label: 'Website',    icon: '🌐', bg: 'rgba(14,165,233,0.15)',  color: '#38bdf8', border: 'rgba(56,189,248,0.3)'  },
+  thumbtack:     { label: 'Thumbtack',  icon: '🔨', bg: 'rgba(34,197,94,0.15)',   color: '#4ade80', border: 'rgba(74,222,128,0.3)'  },
+  inbound_call:  { label: 'Inbound',    icon: '📞', bg: 'rgba(167,139,250,0.15)', color: '#c4b5fd', border: 'rgba(196,181,253,0.3)' },
+  referral:      { label: 'Referral',   icon: '👥', bg: 'rgba(251,191,36,0.15)',  color: '#fbbf24', border: 'rgba(251,191,36,0.3)'  },
+  instagram:     { label: 'Instagram',  icon: '📸', bg: 'rgba(244,63,94,0.15)',   color: '#fb7185', border: 'rgba(244,63,94,0.3)'   },
+  facebook:      { label: 'Facebook',   icon: '👍', bg: 'rgba(59,130,246,0.15)',  color: '#60a5fa', border: 'rgba(59,130,246,0.3)'  },
+};
+
+function SourceBadge({ source }: { source: string }) {
+  const cfg = SOURCE_CONFIG[source];
+  if (!cfg) {
+    return (
+      <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1.5 capitalize border border-white/10 bg-white/5 text-white/40">
+        {source.replace(/_/g, ' ')}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.5 rounded-full mb-1.5"
+      style={{ background: cfg.bg, color: cfg.color, border: `1px solid ${cfg.border}` }}
+    >
+      {cfg.icon} {cfg.label}
+    </span>
+  );
+}
+
 function minutesSince(d: string) {
   return Math.floor((Date.now() - new Date(d).getTime()) / 60000);
 }
@@ -96,12 +124,7 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                       <p className="text-sm font-black text-white truncate leading-tight flex-1">
                         {lead.lead_name || 'Customer'}
                       </p>
-                      <div className="flex gap-1 shrink-0">
-                        {lead.source === 'inbound_call' && (
-                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                            📞
-                          </span>
-                        )}
+                      <div className="flex gap-1 shrink-0flex-wrap">
                         {isNew && (
                           <span className="text-[9px] font-black px-1.5 py-0.5 rounded-full text-white tracking-wide" style={{ backgroundColor: stage.headerBg }}>
                             NEW
@@ -114,6 +137,9 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                         )}
                       </div>
                     </div>
+
+                    {/* Source badge */}
+                    {lead.source && <SourceBadge source={lead.source} />}
 
                     {/* Phone */}
                     <p className="text-xs text-white/40 font-semibold mb-1.5">+{lead.lead_phone}</p>
