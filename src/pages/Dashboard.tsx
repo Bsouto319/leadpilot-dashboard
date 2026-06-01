@@ -185,7 +185,12 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
   function applyPreset(preset: 'today' | '7d' | '30d' | 'all') {
     const now = new Date();
-    const fmt = (d: Date) => d.toISOString().slice(0, 10);
+    const fmt = (d: Date) => {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    };
     if (preset === 'today') { setDateFrom(fmt(now)); setDateTo(fmt(now)); }
     else if (preset === '7d')  { const d = new Date(now); d.setDate(d.getDate() - 6);  setDateFrom(fmt(d)); setDateTo(fmt(now)); }
     else if (preset === '30d') { const d = new Date(now); d.setDate(d.getDate() - 29); setDateFrom(fmt(d)); setDateTo(fmt(now)); }
