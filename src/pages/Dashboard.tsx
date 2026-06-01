@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   Users, Phone, Calendar, TrendingUp, RefreshCw, Download,
   CheckCircle, XCircle, MessageSquare, PhoneCall,
-  LogOut, ArrowLeft, Settings,
+  LogOut, ArrowLeft, Settings, BarChart2,
   KeyRound, HeadphonesIcon, Mail, Image, Volume2,
 } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail, sendCatalogEmail } from '../lib/api';
@@ -13,6 +13,7 @@ import Agenda from '../components/Agenda';
 import Followups from '../components/Followups';
 import Dialpad from '../components/Dialpad';
 import AudioCallModal from '../components/AudioCallModal';
+import Analytics from './Analytics';
 
 export const STAGES = [
   { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: '#16a34a', cardBorder: '#22c55e' },
@@ -32,7 +33,7 @@ interface Props {
 }
 
 
-type ViewType = 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings';
+type ViewType = 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings' | 'analytics';
 
 export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
   const [view, setView]                 = useState<ViewType>('pipeline');
@@ -221,6 +222,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
     { key: 'list',      label: 'Leads'      },
     { key: 'agenda',    label: 'Agenda'     },
     { key: 'followups', label: 'Follow-ups', badge: urgentCount },
+    { key: 'analytics', label: '📊 Analytics' },
     { key: 'dialpad',   label: '📞 Call'    },
     { key: 'settings',  label: 'Settings'   },
   ];
@@ -403,6 +405,12 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
           </div>
         )}
 
+        {view === 'analytics' && (
+          <div className="h-full overflow-hidden">
+            <Analytics />
+          </div>
+        )}
+
         {view === 'settings' && (
           <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
             <SettingsView userEmail={userEmail} />
@@ -479,11 +487,11 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
       }}>
         <div className="flex">
           {([
-            { key: 'pipeline',  icon: TrendingUp, label: 'Pipeline' },
-            { key: 'agenda',    icon: Calendar,   label: 'Agenda'   },
-            { key: 'list',      icon: Users,       label: 'Leads'   },
-            { key: 'dialpad',   icon: Phone,       label: 'Call'    },
-            { key: 'settings',  icon: Settings,    label: 'Settings'},
+            { key: 'pipeline',  icon: TrendingUp,  label: 'Pipeline'  },
+            { key: 'agenda',    icon: Calendar,    label: 'Agenda'    },
+            { key: 'list',      icon: Users,       label: 'Leads'     },
+            { key: 'analytics', icon: BarChart2,   label: 'Analytics' },
+            { key: 'settings',  icon: Settings,    label: 'Settings'  },
           ] as { key: ViewType; icon: React.ElementType; label: string }[]).map(tab => (
             <button
               key={tab.key}
