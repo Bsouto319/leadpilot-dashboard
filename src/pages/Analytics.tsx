@@ -153,12 +153,12 @@ export default function Analytics() {
     const prev             = getPrevRange(period);
 
     const [curRes, prevRes] = await Promise.all([
-      supabase.from('leads')
-        .select('id,lead_name,lead_email,lead_address,source,stage,subject,service_type,notes,created_at,scheduled_at,call_status,follow_up_count,last_response_at')
+      supabase.from('conversations')
+        .select('id,lead_name,lead_email,lead_address,source,stage,email_body,service_type,created_at,scheduled_at,call_status,follow_up_count,last_response_at')
         .eq('client_id', CP_CLIENT_ID)
         .gte('created_at', from).lte('created_at', to),
       prev
-        ? supabase.from('leads')
+        ? supabase.from('conversations')
             .select('id,stage,source,created_at,scheduled_at')
             .eq('client_id', CP_CLIENT_ID)
             .gte('created_at', prev.from).lte('created_at', prev.to)
@@ -235,13 +235,13 @@ export default function Analytics() {
   })).sort((a, b) => b.count - a.count);
 
   // Keywords from subjects + notes
-  const texts = leads.flatMap(l => [l.subject || '', l.service_type || '', l.notes || ''].filter(Boolean));
+  const texts = leads.flatMap(l => [l.email_body || '', l.service_type || ''].filter(Boolean));
   const keywords = extractKeywords(texts);
 
   // Project types (from subject / service_type)
   const projMap: Record<string, number> = {};
   for (const l of leads) {
-    const t = (l.service_type || l.subject || '').trim();
+    const t = (l.service_type || '').trim();
     if (t) projMap[t] = (projMap[t] || 0) + 1;
   }
   const projects = Object.entries(projMap)
