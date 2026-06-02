@@ -6,6 +6,13 @@ import {
   ToggleRight, CheckCircle, XCircle, Building2,
 } from 'lucide-react';
 
+interface ServiceZone {
+  city: string;
+  zip: string;
+  lat: number;
+  lng: number;
+}
+
 interface Client {
   id: string;
   business_name: string;
@@ -24,6 +31,8 @@ interface Client {
   google_review_link: string | null;
   call_start_hour: number;
   call_end_hour: number;
+  service_zones: ServiceZone[];
+  max_radius_miles: number;
   created_at: string;
   conversations: { count: number }[];
 }
@@ -355,22 +364,25 @@ function EditModal({ client, onClose, onSave }: {
   onSave: (fields: any) => void;
 }) {
   const [f, setF] = useState({
-    business_name:     client.business_name,
-    owner_name:        client.owner_name       || '',
-    owner_email:       client.owner_email      || '',
-    owner_phone:       client.owner_phone      || '',
-    twilio_number:     client.twilio_number    || '',
-    active:            client.active,
-    manual_mode:       client.manual_mode,
-    voice_enabled:     client.voice_enabled,
-    niche:             client.niche            || 'general',
-    timezone:          client.timezone         || 'America/New_York',
-    alert_phone:       client.alert_phone      || '',
-    google_review_link:client.google_review_link || '',
-    call_start_hour:   client.call_start_hour  ?? 8,
-    call_end_hour:     client.call_end_hour    ?? 20,
-    ai_system_prompt:  client.ai_system_prompt || '',
+    business_name:      client.business_name,
+    owner_name:         client.owner_name        || '',
+    owner_email:        client.owner_email       || '',
+    owner_phone:        client.owner_phone       || '',
+    twilio_number:      client.twilio_number     || '',
+    active:             client.active,
+    manual_mode:        client.manual_mode,
+    voice_enabled:      client.voice_enabled,
+    niche:              client.niche             || 'general',
+    timezone:           client.timezone          || 'America/New_York',
+    alert_phone:        client.alert_phone       || '',
+    google_review_link: client.google_review_link || '',
+    call_start_hour:    client.call_start_hour   ?? 8,
+    call_end_hour:      client.call_end_hour     ?? 20,
+    ai_system_prompt:   client.ai_system_prompt  || '',
+    service_zones:      client.service_zones     || [] as ServiceZone[],
+    max_radius_miles:   client.max_radius_miles  ?? 50,
   });
+  const [newZone, setNewZone] = useState({ city: '', zip: '', lat: '', lng: '' });
   const [saving, setSaving] = useState(false);
 
   const inp = 'w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500';
@@ -460,6 +472,55 @@ function EditModal({ client, onClose, onSave }: {
                 onChange={e => setF(p => ({ ...p, ai_system_prompt: e.target.value }))}
                 placeholder="Custom instructions for this client's AI..."
               />
+            </div>
+
+            {/* ── Service Zones ── */}
+            <div className="border border-gray-200 rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <label className={lbl + ' mb-0'}>📍 Service Zones</label>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-400">Radius:</span>
+                  <input
+                    type="number" min={5} max={200}
+                    value={f.max_radius_miles}
+                    onChange={e => setF(p => ({ ...p, max_radius_miles: +e.target.value }))}
+                    className="w-16 px-2 py-1 border border-gray-200 rounded-lg text-xs text-center focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  <span className="text-xs text-gray-400">miles</span>
+                </div>
+              </div>
+
+              {/* Existing zones */}
+              {f.service_zones.map((z, i) => (
+                <div key={i} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                  <span className="text-xs font-semibold text-gray-700 flex-1">{z.city} <span className="font-normal text-gray-400">{z.zip}</span></span>
+                  <span className="text-[10px] text-gray-400 font-mono">{z.lat.toFixed(2)}, {z.lng.toFixed(2)}</span>
+                  <button
+                    type="button"
+                    onClick={() => setF(p => ({ ...p, service_zones: p.service_zones.filter((_, idx) => idx !== i) }))}
+                    className="text-red-400 hover:text-red-600 text-xs font-bold ml-1"
+                  >✕</button>
+                </div>
+              ))}
+
+              {/* Add new zone */}
+              <div className="grid grid-cols-2 gap-2">
+                <input className={inp + ' text-xs'} placeholder="City (e.g. Columbia)" value={newZone.city} onChange={e => setNewZone(p => ({ ...p, city: e.target.value }))} />
+                <input className={inp + ' text-xs'} placeholder="ZIP (e.g. 29201)"    value={newZone.zip}  onChange={e => setNewZone(p => ({ ...p, zip: e.target.value }))} />
+                <input className={inp + ' text-xs'} placeholder="Lat (e.g. 34.0007)"  value={newZone.lat}  onChange={e => setNewZone(p => ({ ...p, lat: e.target.value }))} />
+                <input className={inp + ' text-xs'} placeholder="Lng (e.g. -81.0348)" value={newZone.lng}  onChange={e => setNewZone(p => ({ ...p, lng: e.target.value }))} />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!newZone.city || !newZone.zip || !newZone.lat || !newZone.lng) return;
+                  setF(p => ({ ...p, service_zones: [...p.service_zones, { city: newZone.city, zip: newZone.zip, lat: +newZone.lat, lng: +newZone.lng }] }));
+                  setNewZone({ city: '', zip: '', lat: '', lng: '' });
+                }}
+                className="w-full py-2 text-xs font-bold text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition"
+              >
+                + Add Zone
+              </button>
             </div>
 
             <div className="grid grid-cols-3 gap-2">
