@@ -156,7 +156,7 @@ export default function Agenda({ appointments, onCall, onSms, onAudioCall }: Pro
                 <div className="flex flex-col gap-0.5">
                   {apts.slice(0, 2).map(apt => {
                     const s = STAGE_STYLE[apt.stage] || STAGE_STYLE.scheduled;
-                    const time = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+                    const time = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
                     return (
                       <div
                         key={apt.id}
@@ -203,7 +203,7 @@ export default function Agenda({ appointments, onCall, onSms, onAudioCall }: Pro
               {selectedApts.map(apt => {
                 const s     = STAGE_STYLE[apt.stage] || STAGE_STYLE.scheduled;
                 const label = STAGE_LABEL[apt.stage]  || apt.stage;
-                const time  = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                const time  = new Date(apt.scheduled_at).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit' });
                 return (
                   <div key={apt.id} className="px-5 py-4 flex items-center gap-4">
                     {/* Time block */}

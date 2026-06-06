@@ -161,7 +161,7 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                     {/* Scheduled date */}
                     {lead.scheduled_at && (
                       <p className="text-xs text-emerald-400 font-semibold mb-1.5">
-                        📅 {new Date(lead.scheduled_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        📅 {new Date(lead.scheduled_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })} ET
                       </p>
                     )}
 
