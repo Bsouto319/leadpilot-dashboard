@@ -413,7 +413,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
         {view === 'settings' && (
           <div className="h-full px-4 sm:px-6 pb-6 pt-3 overflow-y-auto">
-            <SettingsView userEmail={userEmail} />
+            <SettingsView userEmail={userEmail} clientId={clientId} />
           </div>
         )}
       </main>
@@ -515,7 +515,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
 // ── SETTINGS VIEW ──────────────────────────────────────────────────────────────
 
-function SettingsView({ userEmail }: { userEmail?: string }) {
+function SettingsView({ userEmail, clientId }: { userEmail?: string; clientId: string }) {
   const [pwd, setPwd]               = useState('');
   const [pwd2, setPwd2]             = useState('');
   const [pwdSaving, setPwdSaving]   = useState(false);
@@ -523,6 +523,61 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
   const [msg, setMsg]               = useState('');
   const [msgSending, setMsgSending] = useState(false);
   const [msgSent, setMsgSent]       = useState(false);
+
+  // Service Zones
+  const [zones, setZones]           = useState<{ city: string; zip: string; lat: number; lng: number }[]>([]);
+  const [radius, setRadius]         = useState(50);
+  const [zoneInput, setZoneInput]   = useState('');
+  const [zoneLoading, setZoneLoading] = useState(false);
+  const [zoneSaving, setZoneSaving]   = useState(false);
+  const [zoneMsg, setZoneMsg]         = useState('');
+  const [zonesLoaded, setZonesLoaded] = useState(false);
+
+  useEffect(() => {
+    supabase.from('clients')
+      .select('service_zones, max_radius_miles')
+      .eq('id', clientId)
+      .single()
+      .then(({ data }) => {
+        if (data?.service_zones) setZones(data.service_zones);
+        if (data?.max_radius_miles) setRadius(data.max_radius_miles);
+        setZonesLoaded(true);
+      });
+  }, [clientId]);
+
+  async function geocodeAndAdd() {
+    if (!zoneInput.trim()) return;
+    setZoneLoading(true);
+    setZoneMsg('');
+    try {
+      const q = encodeURIComponent(zoneInput.trim() + ', USA');
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1&countrycodes=us`, {
+        headers: { 'User-Agent': 'LeadPilot/1.0' },
+      });
+      const data = await res.json();
+      if (!data.length) { setZoneMsg('City or ZIP not found. Try "Columbia SC" or "29201".'); setZoneLoading(false); return; }
+      const { lat, lon, address } = data[0];
+      const city = address?.city || address?.town || address?.village || address?.county || zoneInput.trim();
+      const zip  = address?.postcode || zoneInput.trim();
+      if (zones.some(z => Math.abs(z.lat - +lat) < 0.01 && Math.abs(z.lng - +lon) < 0.01)) {
+        setZoneMsg('This location is already added.'); setZoneLoading(false); return;
+      }
+      setZones(prev => [...prev, { city, zip, lat: parseFloat(lat), lng: parseFloat(lon) }]);
+      setZoneInput('');
+    } catch { setZoneMsg('Error looking up location. Try again.'); }
+    setZoneLoading(false);
+  }
+
+  async function saveZones() {
+    setZoneSaving(true); setZoneMsg('');
+    const { error } = await supabase
+      .from('clients')
+      .update({ service_zones: zones, max_radius_miles: radius })
+      .eq('id', clientId);
+    if (error) setZoneMsg('Error saving. Try again.');
+    else setZoneMsg('✓ Service zones saved!');
+    setZoneSaving(false);
+  }
 
   const inp = 'w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition';
 
@@ -556,6 +611,74 @@ function SettingsView({ userEmail }: { userEmail?: string }) {
 
   return (
     <div className="max-w-md space-y-4">
+
+      {/* Service Zones */}
+      <div className="border border-white/10 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <div className="flex items-center gap-2 mb-4">
+          <span className="text-blue-400 text-base">📍</span>
+          <h3 className="text-sm font-black text-white">Service Zones</h3>
+        </div>
+        <p className="text-xs text-white/40 mb-3">Add the cities or ZIP codes where you accept jobs. Type a city name or ZIP and press Add.</p>
+
+        {/* Current zones */}
+        {zonesLoaded && zones.length === 0 && (
+          <p className="text-xs text-white/30 italic mb-3">No zones added yet.</p>
+        )}
+        <div className="space-y-2 mb-3">
+          {zones.map((z, i) => (
+            <div key={i} className="flex items-center justify-between bg-white/5 border border-white/10 rounded-xl px-3 py-2">
+              <div>
+                <span className="text-sm font-semibold text-white">{z.city}</span>
+                {z.zip && <span className="text-xs text-white/40 ml-2">{z.zip}</span>}
+              </div>
+              <button
+                onClick={() => setZones(prev => prev.filter((_, idx) => idx !== i))}
+                className="text-red-400 hover:text-red-300 text-xs font-bold px-2"
+              >✕</button>
+            </div>
+          ))}
+        </div>
+
+        {/* Add zone input */}
+        <div className="flex gap-2 mb-3">
+          <input
+            className="flex-1 px-3 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition"
+            placeholder='e.g. "Columbia SC" or "29201"'
+            value={zoneInput}
+            onChange={e => setZoneInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), geocodeAndAdd())}
+          />
+          <button
+            onClick={geocodeAndAdd}
+            disabled={zoneLoading || !zoneInput.trim()}
+            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white text-xs font-black rounded-xl transition"
+          >{zoneLoading ? '…' : '+ Add'}</button>
+        </div>
+
+        {/* Radius */}
+        <div className="mb-4">
+          <label className="text-xs text-white/50 mb-1 block">Service radius: <span className="text-white font-bold">{radius} miles</span></label>
+          <input
+            type="range" min={10} max={150} step={5}
+            value={radius}
+            onChange={e => setRadius(+e.target.value)}
+            className="w-full accent-blue-500"
+          />
+          <div className="flex justify-between text-[10px] text-white/30 mt-0.5"><span>10 mi</span><span>150 mi</span></div>
+        </div>
+
+        {zoneMsg && (
+          <p className={`text-xs px-3 py-2 rounded-xl border mb-3 ${
+            zoneMsg.startsWith('✓') ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'
+          }`}>{zoneMsg}</p>
+        )}
+
+        <button
+          onClick={saveZones}
+          disabled={zoneSaving}
+          className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-sm font-black rounded-xl transition"
+        >{zoneSaving ? 'Saving…' : 'Save Service Zones'}</button>
+      </div>
 
       {/* Account info */}
       <div className="border border-white/10 rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.05)' }}>
@@ -802,7 +925,7 @@ function LeadModal({ lead, stages, onClose, onStageChange, onNotesSave, onContac
                 <Row label="Email"><span className="text-blue-600">{editEmail || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 <Row label="Address"><span>{editAddress || <span className="text-gray-300 italic">not set</span>}</span></Row>
                 <Row label="Service"><span className="capitalize">{editService?.replace(/_/g, ' ') || <span className="text-gray-300 italic">not set</span>}</span></Row>
-                {lead.scheduled_at && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
+                {lead.scheduled_at && <Row label="Scheduled"><span className="text-emerald-700 font-medium">{new Date(lead.scheduled_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday:'short', month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })} ET</span></Row>}
                 {lead.source       && <Row label="Source"><span className="capitalize">{lead.source.replace(/_/g, ' ')}</span></Row>}
                 {lead.last_response_at && <Row label="Last activity"><span className="text-blue-600 font-semibold">{new Date(lead.last_response_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>}
                 <Row label="Received"><span className="text-gray-400">{new Date(lead.created_at).toLocaleString('en-US', { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}</span></Row>

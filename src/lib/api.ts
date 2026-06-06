@@ -18,8 +18,8 @@ export async function fetchLeads(params: { page?: number; search?: string; stage
 
   if (params.stage)    query = query.eq('stage', params.stage);
   if (params.search)   query = query.or(`lead_name.ilike.%${params.search}%,lead_phone.ilike.%${params.search}%`);
-  if (params.dateFrom) query = query.gte('created_at', params.dateFrom);
-  if (params.dateTo)   query = query.lte('created_at', params.dateTo + 'T23:59:59.999Z');
+  if (params.dateFrom) query = query.gte('created_at', new Date(params.dateFrom + 'T00:00:00').toISOString());
+  if (params.dateTo)   query = query.lte('created_at', new Date(params.dateTo   + 'T23:59:59.999').toISOString());
 
   const { data, count, error } = await query;
   if (error) console.error('fetchLeads', error.message);
