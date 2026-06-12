@@ -3,8 +3,14 @@ import { supabase } from './lib/supabase';
 import Login, { ResetPassword } from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import AdminPanel from './pages/AdminPanel';
+import BusinessCard from './pages/BusinessCard';
 
 export default function App() {
+  // Public routes — no auth required
+  const path = window.location.pathname;
+  const cardMatch = path.match(/^\/card\/([a-z0-9\-]+)$/i);
+  if (cardMatch) return <BusinessCard slug={cardMatch[1]} />;
+
   const [session, setSession]             = useState<any>(null);
   const [client, setClient]               = useState<any>(null);
   const [loading, setLoading]             = useState(true);
