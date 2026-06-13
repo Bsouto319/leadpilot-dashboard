@@ -6,13 +6,16 @@ import {
   DollarSign, BarChart2, MapPin, Star, AlertTriangle,
 } from 'lucide-react';
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-const CP_CLIENT_ID = '5221cab9-a741-4ddc-a752-2359826fba95';
-const BUSINESS     = 'CP Cabinets & Quartz';
+interface AnalyticsProps {
+  clientId: string;
+  businessName: string;
+}
 
 const STAGES: Record<string, { label: string; color: string }> = {
   new_lead:     { label: 'New Lead',    color: '#6366f1' },
+  form_filled:  { label: 'Form Filled', color: '#f97316' },
   ai_responded: { label: 'Contacted',  color: '#0ea5e9' },
   scheduled:    { label: 'Visit Sched',color: '#f59e0b' },
   completed:    { label: 'Visited',    color: '#22c55e' },
@@ -37,7 +40,7 @@ const EN_STOPWORDS = new Set([
   'when','where','why','not','no','yes','get','got','need','want','like',
   'just','also','very','really','hi','hello','hey','thanks','thank','please',
   'ok','okay','sure','yes','some','all','any','more','am','im','looking',
-  'interested','kitchen','cabinets','quartz','quote','estimate','install',
+  'interested','quote','estimate','install','price','cost','much','need',
   'interested in','would like','let me know','reach out','looking for',
 ]);
 
@@ -141,11 +144,12 @@ function SectionHeader({ icon: Icon, title, sub, color = 'text-sky-400' }: { ico
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
-export default function Analytics() {
+export default function Analytics({ clientId, businessName }: AnalyticsProps) {
   const [period, setPeriod]   = useState<Period>('30d');
   const [leads, setLeads]     = useState<any[]>([]);
   const [prevLeads, setPrev]  = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [niche, setNiche]     = useState<string>('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -155,12 +159,12 @@ export default function Analytics() {
     const [curRes, prevRes] = await Promise.all([
       supabase.from('conversations')
         .select('id,lead_name,lead_email,lead_address,source,stage,email_body,service_type,created_at,scheduled_at,call_status,follow_up_count,last_response_at')
-        .eq('client_id', CP_CLIENT_ID)
+        .eq('client_id', clientId)
         .gte('created_at', from).lte('created_at', to),
       prev
         ? supabase.from('conversations')
             .select('id,stage,source,created_at,scheduled_at')
-            .eq('client_id', CP_CLIENT_ID)
+            .eq('client_id', clientId)
             .gte('created_at', prev.from).lte('created_at', prev.to)
         : Promise.resolve({ data: [] }),
     ]);
@@ -171,6 +175,11 @@ export default function Analytics() {
   }, [period]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    supabase.from('clients').select('niche').eq('id', clientId).single()
+      .then(({ data }) => { if (data?.niche) setNiche(data.niche); });
+  }, [clientId]);
 
   // ─── Derived metrics ──────────────────────────────────────────────────────
 
@@ -255,19 +264,26 @@ export default function Analytics() {
     ? Math.round(completedLeads.reduce((s, l) => s + (new Date(l.scheduled_at).getTime() - new Date(l.created_at).getTime()) / 86400000, 0) / completedLeads.length)
     : null;
 
-  // Google Ads keyword groups
-  const adsKeywordGroups = [
-    { group: 'Kitchen Cabinets', keywords: ['kitchen cabinets', 'kitchen cabinet installation', 'new kitchen cabinets', 'custom kitchen cabinets', 'kitchen remodel'], cpcEst: '$3–8' },
-    { group: 'Quartz Countertops', keywords: ['quartz countertops', 'quartz countertop installation', 'granite countertops', 'countertop replacement', 'kitchen countertops'], cpcEst: '$4–10' },
-    { group: 'Bathroom Vanity', keywords: ['bathroom vanity', 'bathroom cabinets', 'bathroom remodel', 'bathroom renovation', 'vanity installation'], cpcEst: '$3–7' },
-    { group: 'Local Intent', keywords: ['"cabinet installer near me"', '"quartz countertops near me"', '"kitchen remodel South Carolina"', '"flooring contractor SC"'], cpcEst: '$5–12' },
+  // Google Ads keyword groups — niche-aware
+  const isCleaning = niche === 'cleaning' || businessName.toLowerCase().includes('clean');
+  const topProject = projects[0]?.type || 'home improvement';
+  const adsKeywordGroups = isCleaning ? [
+    { group: 'House Cleaning', keywords: ['"house cleaning near me"', '"home cleaning service"', '"maid service near me"', '"residential cleaning"', '"house cleaner"'], cpcEst: '$3–8' },
+    { group: 'Deep Cleaning', keywords: ['"deep cleaning service"', '"move in cleaning"', '"move out cleaning"', '"one time deep clean"', '"deep house clean"'], cpcEst: '$4–10' },
+    { group: 'Recurring Service', keywords: ['"weekly house cleaning"', '"biweekly cleaning service"', '"monthly maid service"', '"recurring cleaning"', '"regular house cleaner"'], cpcEst: '$2–6' },
+    { group: 'Local Intent', keywords: ['"cleaning service near me"', '"maid service Orlando"', '"house cleaning Kissimmee"', '"local cleaning company"', '"licensed cleaning company"'], cpcEst: '$3–9' },
+  ] : [
+    { group: topProject, keywords: [`${topProject} contractor`, `${topProject} installation`, `professional ${topProject}`, `local ${topProject} company`, `${topProject} near me`], cpcEst: '$3–10' },
+    { group: 'Free Estimate', keywords: ['"free estimate near me"', '"free in-home estimate"', '"contractor free quote"', '"local contractor quote"'], cpcEst: '$4–10' },
+    { group: 'Local Intent', keywords: ['"contractor near me"', '"home improvement near me"', `"${topProject} near me"`, '"licensed contractor"'], cpcEst: '$5–12' },
+    { group: 'Reviews / Trust', keywords: ['"best rated contractor"', '"top rated local contractor"', '"5 star contractor"', '"licensed and insured"'], cpcEst: '$3–7' },
   ];
 
-  // ROI estimator
-  const estCPC     = 6;    // avg $6 CPC for cabinet/quartz keywords
-  const estCVR     = 0.08; // 8% form submission rate from paid click
+  // ROI estimator — niche-aware
+  const estCPC     = isCleaning ? 5  : 6;
+  const estCVR     = 0.08;
   const estClose   = total > 0 && scheduled > 0 ? scheduled / total : 0.25;
-  const estRevenue = 8500; // avg project value CP Cabinets
+  const estRevenue = isCleaning ? 300 : 5000; // cleaning: ~$300 LTV recurring; contractor: ~$5k project
   const budgets    = [500, 1000, 2000, 3000];
 
   const periodoLabel = period === '7d' ? 'Last 7 days' : period === '30d' ? 'Last 30 days' : period === '90d' ? 'Last 90 days' : 'All time';
@@ -279,7 +295,7 @@ export default function Analytics() {
       <div className="flex flex-wrap items-center gap-3 justify-between">
         <div>
           <h2 className="text-white font-black text-xl">Analytics & Ads Intelligence</h2>
-          <p className="text-white/30 text-xs mt-0.5">{BUSINESS} · {periodoLabel}</p>
+          <p className="text-white/30 text-xs mt-0.5">{businessName} · {periodoLabel}</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex rounded-xl overflow-hidden border border-white/10">
@@ -580,7 +596,7 @@ export default function Analytics() {
               <div>
                 <p className="text-amber-300 font-black text-xl">${estCPC}</p>
                 <p className="text-white/30 text-[10px] font-bold mt-1">Est. CPC</p>
-                <p className="text-white/20 text-[9px]">avg cabinet/quartz keywords</p>
+                <p className="text-white/20 text-[9px]">avg home improvement keywords</p>
               </div>
               <div>
                 <p className="text-sky-300 font-black text-xl">${estRevenue.toLocaleString()}</p>
@@ -650,8 +666,8 @@ export default function Analytics() {
                 icon: Users,
                 color: '#0ea5e9',
                 items: [
-                  'Target homeowners 35–65 within 40mi of Columbia, SC',
-                  'Use "In-market: Kitchen & Bathroom Remodeling" audience',
+                  'Target homeowners 35–65 within your service area radius',
+                  'Use "In-market: Home Improvement" or relevant Google audience',
                   'Add Customer Match with your existing lead emails',
                   bestSource ? `${bestSource.src} converts at ${bestSource.rate}% — consider similar targeting` : 'Track source UTMs to identify best channels',
                 ],
@@ -661,10 +677,10 @@ export default function Analytics() {
                 icon: Zap,
                 color: '#22c55e',
                 items: [
-                  `Highlight top requested project: "${projects[0]?.type || 'Kitchen Cabinets'}"`,
+                  `Highlight top requested project: "${projects[0]?.type || topProject}"`,
                   'Use "Free In-Home Estimate" CTA — low friction for homeowners',
                   'Include "Licensed & Insured" and certifications in ad text',
-                  'Test "Quartz + Cabinets Bundle" offers — premium positioning',
+                  'Test bundle offers with your main services — premium positioning',
                 ],
               },
               {
@@ -675,7 +691,7 @@ export default function Analytics() {
                   `Start with $1,000–1,500/mo — est. ${Math.round(1000/estCPC * estCVR * (convRate/100))} visits/mo`,
                   'Use Target CPA bidding after 30+ conversions tracked',
                   'Set conversion action: form submit + phone call',
-                  'Add call extensions — cabinet buyers prefer to call',
+                  'Add call extensions — service buyers often prefer to call',
                 ],
               },
             ].map(card => (

@@ -17,6 +17,7 @@ import Analytics from './Analytics';
 
 export const STAGES = [
   { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: '#16a34a', cardBorder: '#22c55e' },
+  { key: 'form_filled',      label: 'Form Filled',      color: 'bg-orange-400/15 text-orange-300',   headerBg: '#ea580c', cardBorder: '#fb923c' },
   { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-400/15 text-sky-300',         headerBg: '#0284c7', cardBorder: '#38bdf8' },
   { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-400/15 text-amber-300',     headerBg: '#d97706', cardBorder: '#fbbf24' },
   { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-400/15 text-emerald-300', headerBg: '#059669', cardBorder: '#34d399' },
@@ -407,7 +408,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
 
         {view === 'analytics' && (
           <div className="h-full overflow-hidden">
-            <Analytics />
+            <Analytics clientId={clientId} businessName={businessName} />
           </div>
         )}
 
