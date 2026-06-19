@@ -41,6 +41,8 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
   const [audioCallStatus, setAudioCallStatus] = useState<'idle' | 'recording' | 'processing' | 'done' | 'error'>('idle');
   const [audioCallResult, setAudioCallResult] = useState<{ callSid: string; transcription: string; translation: string } | null>(null);
   const [audioCallError, setAudioCallError]   = useState('');
+  const [audioTargetLang, setAudioTargetLang] = useState('en');
+  const [audioVoice, setAudioVoice]           = useState<'female' | 'male'>('female');
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef   = useRef<BlobEvent['data'][]>([]);
 
@@ -229,7 +231,7 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
       const resp = await fetch(`${API}/api/admin/send-audio-call`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
-        body: JSON.stringify({ audioBase64: base64, audioMimetype: 'audio/webm', phone: audioCallPhone, clientId }),
+        body: JSON.stringify({ audioBase64: base64, audioMimetype: 'audio/webm', phone: audioCallPhone, clientId, targetLang: audioTargetLang, voice: audioVoice }),
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || `HTTP ${resp.status}`);
@@ -391,8 +393,36 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
       {/* ── Mensagem de Voz ─────────────────────────────────────── */}
       <div className="border-t border-gray-100 pt-4 space-y-3">
         <p className="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center gap-1.5">
-          <Mic size={11} /> Mensagem de Voz (PT/ES → EN)
+          <Mic size={11} /> Mensagem de Voz
         </p>
+
+        {/* Seletor de idioma destino */}
+        <div className="flex gap-2">
+          {[
+            { code: 'en', label: '🇺🇸 EN' },
+            { code: 'pt', label: '🇧🇷 PT' },
+            { code: 'es', label: '🇪🇸 ES' },
+          ].map(l => (
+            <button
+              key={l.code}
+              onClick={() => setAudioTargetLang(l.code)}
+              className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition touch-manipulation ${
+                audioTargetLang === l.code
+                  ? 'bg-purple-600 text-white'
+                  : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {l.label}
+            </button>
+          ))}
+          <button
+            onClick={() => setAudioVoice(v => v === 'female' ? 'male' : 'female')}
+            className="px-2.5 py-1.5 text-xs font-bold rounded-lg bg-gray-100 text-gray-500 hover:bg-gray-200 transition touch-manipulation"
+            title="Trocar voz"
+          >
+            {audioVoice === 'female' ? '♀' : '♂'}
+          </button>
+        </div>
 
         {/* Número destino */}
         <input
