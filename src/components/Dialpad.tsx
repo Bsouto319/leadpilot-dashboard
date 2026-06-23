@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight, Wifi, Mic, MicOff, Send, Loader } from 'lucide-react';
+import { Phone, PhoneOff, PhoneCall, PhoneIncoming, RefreshCw, ToggleLeft, ToggleRight, Wifi, Mic, MicOff, Send, Loader, Bot, PhoneMissed, PhoneCall as PhoneCallIcon, Clock } from 'lucide-react';
 
 const API = import.meta.env.VITE_API_URL as string;
 const KEY = import.meta.env.VITE_ADMIN_KEY as string;
@@ -10,6 +10,108 @@ type Status = 'disconnected' | 'loading' | 'idle' | 'ringing' | 'active' | 'erro
 interface DialpadProps { initialPhone?: string; }
 
 const RESTRICTED_CODES = new Set([21216, 13225, 31005, 31009]);
+
+// ── Alice Dialpad Toggle ──────────────────────────────────────────────────────
+function AliceDialpadToggle({ clientId }: { clientId: string }) {
+  const [active, setActive]     = useState(false);
+  const [loading, setLoading]   = useState(true);
+  const [toggling, setToggling] = useState(false);
+  const [analytics, setAnalytics] = useState<any>(null);
+
+  useEffect(() => {
+    if (!clientId) return;
+    Promise.all([
+      fetch(`${API}/api/dialpad/status/${clientId}`, { headers: { 'x-admin-key': KEY } }).then(r => r.json()),
+      fetch(`${API}/api/dialpad/analytics/${clientId}?days=7`, { headers: { 'x-admin-key': KEY } }).then(r => r.json()),
+    ]).then(([status, stats]) => {
+      setActive(!!status.alice_active);
+      if (!stats.error) setAnalytics(stats);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, [clientId]);
+
+  async function toggle() {
+    if (toggling) return;
+    setToggling(true);
+    const next = !active;
+    try {
+      const r = await fetch(`${API}/api/dialpad/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
+        body: JSON.stringify({ clientId, active: next }),
+      });
+      const data = await r.json();
+      if (r.ok) setActive(data.alice_active);
+    } catch {} finally {
+      setToggling(false);
+    }
+  }
+
+  if (loading) return (
+    <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 animate-pulse h-24" />
+  );
+
+  return (
+    <div className={`rounded-2xl border p-4 space-y-3 ${active ? 'bg-orange-50 border-orange-300' : 'bg-gray-50 border-gray-200'}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${active ? 'bg-orange-500' : 'bg-gray-300'}`}>
+            <Bot size={16} className="text-white" />
+          </div>
+          <div>
+            <p className="text-sm font-bold text-gray-800">Alice via Dialpad</p>
+            <p className="text-xs text-gray-500">{active ? 'Ligações encaminhadas à Alice' : 'Secretaria atende normalmente'}</p>
+          </div>
+        </div>
+        <button
+          onClick={toggle}
+          disabled={toggling}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition touch-manipulation ${
+            active
+              ? 'bg-orange-500 text-white hover:bg-orange-600'
+              : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+          } disabled:opacity-50`}
+        >
+          {toggling
+            ? <Loader size={12} className="animate-spin" />
+            : active ? <ToggleRight size={14} /> : <ToggleLeft size={14} />
+          }
+          {active ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
+      {/* Analytics 7d */}
+      {analytics && (
+        <div className="grid grid-cols-3 gap-2 pt-1 border-t border-orange-100">
+          <div className="text-center">
+            <p className="text-lg font-bold text-gray-800">{analytics.total ?? 0}</p>
+            <p className="text-xs text-gray-500 flex items-center justify-center gap-0.5">
+              <PhoneCallIcon size={9} /> Total
+            </p>
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-bold ${(analytics.missed ?? 0) > 0 ? 'text-red-600' : 'text-gray-800'}`}>
+              {analytics.missed ?? 0}
+            </p>
+            <p className="text-xs text-gray-500 flex items-center justify-center gap-0.5">
+              <PhoneMissed size={9} /> Perdidas
+            </p>
+          </div>
+          <div className="text-center">
+            <p className={`text-lg font-bold ${(analytics.miss_rate ?? 0) > 30 ? 'text-red-600' : 'text-gray-800'}`}>
+              {analytics.miss_rate ?? 0}%
+            </p>
+            <p className="text-xs text-gray-500 flex items-center justify-center gap-0.5">
+              <Clock size={9} /> Miss rate
+            </p>
+          </div>
+        </div>
+      )}
+
+      <p className="text-xs text-gray-400">Últimos 7 dias · (803) 373-8191 → Alice</p>
+    </div>
+  );
+}
 
 function friendlyError(err: any): string {
   const code = err?.code ?? err?.twilioError?.code;
@@ -248,7 +350,9 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
   // ── TELA: não conectado ainda ──
   if (status === 'disconnected') {
     return (
-      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm max-w-sm p-6 space-y-4">
+      <div className="max-w-sm space-y-3">
+        {clientId && <AliceDialpadToggle clientId={clientId} />}
+        <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-6 space-y-4">
         <div>
           <h3 className="text-base font-bold text-gray-900">Softphone</h3>
           <p className="text-sm text-gray-400 mt-0.5">Saindo de: {fromNumber}</p>
@@ -265,6 +369,7 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
             <Phone size={16} /> Conectar
           </button>
         </div>
+        </div>
       </div>
     );
   }
@@ -279,7 +384,10 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
   };
 
   return (
-    <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm max-w-sm p-5 space-y-4">
+    <div className="max-w-sm space-y-3">
+      {clientId && <AliceDialpadToggle clientId={clientId} />}
+
+    <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-white shadow-sm p-5 space-y-4">
 
       {/* Banner de ligação recebida */}
       {incomingCall && (
@@ -486,6 +594,7 @@ export default function Dialpad({ initialPhone }: DialpadProps) {
           <p className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-xl px-3 py-2">{audioCallError}</p>
         )}
       </div>
+    </div>
     </div>
   );
 }
