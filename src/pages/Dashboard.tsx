@@ -4,6 +4,7 @@ import {
   CheckCircle, XCircle, MessageSquare, PhoneCall,
   LogOut, ArrowLeft, Settings, BarChart2,
   KeyRound, HeadphonesIcon, Mail, Image, Volume2,
+  Bot, ToggleLeft, ToggleRight,
 } from 'lucide-react';
 import { fetchStats, fetchLeads, fetchAppointments, updateLead, deleteLead, exportLeadsUrl, fetchMessages, sendLeadEmail, sendCatalogEmail } from '../lib/api';
 import { supabase } from '../lib/supabase';
@@ -56,6 +57,9 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   const [emailModal, setEmailModal]     = useState<{ leadId: string; leadName: string } | null>(null);
   const [audioCallModal, setAudioCallModal] = useState<{ phone: string; leadName?: string } | null>(null);
   const [newLeadAlert, setNewLeadAlert] = useState(false);
+  const [aliceActive, setAliceActive]   = useState(false);
+  const [aliceAvailable, setAliceAvailable] = useState(false);
+  const [aliceToggling, setAliceToggling]   = useState(false);
 
   const viewRef = useRef(view);
   viewRef.current = view;
@@ -95,6 +99,34 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
   }, [clientId, page, search, stageFilter, dateFrom, dateTo]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Alice Dialpad toggle — fetch status once on mount
+  useEffect(() => {
+    const API = import.meta.env.VITE_API_URL as string;
+    const KEY = import.meta.env.VITE_ADMIN_KEY as string;
+    fetch(`${API}/api/dialpad/status/${clientId}`, { headers: { 'x-admin-key': KEY } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d) { setAliceAvailable(true); setAliceActive(!!d.alice_active); } })
+      .catch(() => {});
+  }, [clientId]);
+
+  async function toggleAlice() {
+    if (aliceToggling) return;
+    setAliceToggling(true);
+    const API = import.meta.env.VITE_API_URL as string;
+    const KEY = import.meta.env.VITE_ADMIN_KEY as string;
+    const next = !aliceActive;
+    try {
+      const r = await fetch(`${API}/api/dialpad/toggle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-key': KEY },
+        body: JSON.stringify({ clientId, active: next }),
+      });
+      if (r.ok) setAliceActive(next);
+    } catch {} finally {
+      setAliceToggling(false);
+    }
+  }
 
   useEffect(() => {
     const channel = supabase
@@ -288,6 +320,24 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
             >
               <Download size={13} /> Export
             </a>
+
+            {/* Alice Dialpad toggle — só aparece se cliente tem Dialpad configurado */}
+            {aliceAvailable && (
+              <button
+                onClick={toggleAlice}
+                disabled={aliceToggling}
+                title={aliceActive ? 'Alice ON — Desligar' : 'Alice OFF — Ligar'}
+                className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border transition disabled:opacity-50 ${
+                  aliceActive
+                    ? 'bg-orange-500 border-orange-400 text-white hover:bg-orange-600'
+                    : 'bg-white/5 border-white/10 text-white/50 hover:bg-white/10 hover:text-white/80'
+                }`}
+              >
+                <Bot size={13} />
+                {aliceToggling ? '…' : aliceActive ? <><ToggleRight size={14} /> Alice ON</> : <><ToggleLeft size={14} /> Alice OFF</>}
+              </button>
+            )}
+
             <button
               onClick={() => { setRefreshing(true); load(); }}
               className="p-2 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition"
