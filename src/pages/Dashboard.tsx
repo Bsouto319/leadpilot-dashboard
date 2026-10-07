@@ -16,15 +16,20 @@ import Dialpad from '../components/Dialpad';
 import AudioCallModal from '../components/AudioCallModal';
 import Analytics from './Analytics';
 
+// Paleta única "da casa" (navy) em todo o board -- diferenciação de estágio fica só
+// no título da coluna; a cor virou sinal de origem do lead (ver SOURCE_CONFIG no Pipeline).
+const KANBAN_HEADER = '#1f3864';
+const KANBAN_ACCENT = '#64748b';
+
 export const STAGES = [
-  { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: '#16a34a', cardBorder: '#22c55e' },
-  { key: 'form_filled',      label: 'Form Filled',      color: 'bg-orange-400/15 text-orange-300',   headerBg: '#ea580c', cardBorder: '#fb923c' },
-  { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-400/15 text-sky-300',         headerBg: '#0284c7', cardBorder: '#38bdf8' },
-  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-400/15 text-amber-300',     headerBg: '#d97706', cardBorder: '#fbbf24' },
-  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-400/15 text-emerald-300', headerBg: '#059669', cardBorder: '#34d399' },
-  { key: 'visited',          label: 'Visited',          color: 'bg-purple-400/15 text-purple-300',   headerBg: '#7c3aed', cardBorder: '#a78bfa' },
-  { key: 'completed',        label: 'Completed',        color: 'bg-teal-400/15 text-teal-300',       headerBg: '#0d9488', cardBorder: '#2dd4bf' },
-  { key: 'no_show',          label: 'No Show',          color: 'bg-rose-400/15 text-rose-300',       headerBg: '#dc2626', cardBorder: '#f87171' },
+  { key: 'new_lead',         label: 'New Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'form_filled',      label: 'Form Filled',      color: 'bg-orange-400/15 text-orange-300',   headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'ai_responded',     label: 'Called',           color: 'bg-sky-400/15 text-sky-300',         headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'awaiting_address', label: 'Awaiting Address', color: 'bg-amber-400/15 text-amber-300',     headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'scheduled',        label: 'Scheduled',        color: 'bg-emerald-400/15 text-emerald-300', headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'visited',          label: 'Visited',          color: 'bg-purple-400/15 text-purple-300',   headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'completed',        label: 'Completed',        color: 'bg-teal-400/15 text-teal-300',       headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'no_show',          label: 'No Show',          color: 'bg-rose-400/15 text-rose-300',       headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
 ];
 
 interface Props {
