@@ -133,7 +133,8 @@ export default function Pipeline({ leads, stages, onSelect }: { leads: Lead[]; s
                         </div>
                       </div>
                       <div className="flex items-center justify-between mt-0.5">
-                        <p className="text-[10px] text-[#8991a3] font-semibold truncate">
+                        <p className="text-[10px] text-[#8991a3] font-semibold truncate flex items-center gap-1">
+                          {srcCfg && <span title={srcCfg.label}>{srcCfg.icon}</span>}
                           +{lead.lead_phone}
                         </p>
                         <span className={`text-[9px] font-bold ml-1 shrink-0 ${noReply ? 'text-[#b91c1c]' : 'text-[#aab1c0]'}`}>

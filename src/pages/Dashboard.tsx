@@ -477,6 +477,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
       {/* ── LEAD MODAL ── */}
       {selectedLead && (
         <LeadModal
+          key={selectedLead.id}
           lead={selectedLead}
           stages={STAGES}
           onClose={() => setSelectedLead(null)}
