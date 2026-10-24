@@ -32,6 +32,18 @@ export const STAGES = [
   { key: 'no_show',          label: 'No Show',          color: 'bg-rose-400/15 text-rose-300',       headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
 ];
 
+// Colunas específicas da BTech (venda de SaaS/ecommerce via Hotmart) -- bem
+// diferente do funil de visita presencial dos outros clientes (contractors),
+// por isso é um pipeline separado, só pra esse client_id, sem tocar em STAGES.
+const BTECH_CLIENT_ID = '9f4688cd-42ef-4203-b9de-99322965003a';
+const BTECH_STAGES = [
+  { key: 'new_lead',         label: 'Novo Lead',         color: 'bg-green-400/15 text-green-300',     headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'compra_aprovada',  label: 'Compra Aprovada',   color: 'bg-emerald-400/15 text-emerald-300', headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'onboarding_feito', label: 'Onboarding Feito',  color: 'bg-sky-400/15 text-sky-300',         headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'cliente_ativo',    label: 'Cliente Ativo',     color: 'bg-purple-400/15 text-purple-300',   headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+  { key: 'no_show',          label: 'Perdido',           color: 'bg-rose-400/15 text-rose-300',       headerBg: KANBAN_HEADER, cardBorder: KANBAN_ACCENT },
+];
+
 interface Props {
   clientId: string;
   businessName: string;
@@ -43,6 +55,7 @@ interface Props {
 type ViewType = 'pipeline' | 'list' | 'agenda' | 'followups' | 'dialpad' | 'settings' | 'analytics';
 
 export default function Dashboard({ clientId, businessName, userEmail, onBack }: Props) {
+  const stages = clientId === BTECH_CLIENT_ID ? BTECH_STAGES : STAGES;
   const [view, setView]                 = useState<ViewType>('pipeline');
   const [stats, setStats]               = useState<any>(null);
   const [leads, setLeads]               = useState<any[]>([]);
@@ -379,7 +392,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
             <PeriodBar dateFrom={dateFrom} dateTo={dateTo} hasFilter={!!hasDateFilter}
               onPreset={applyPreset} onFrom={v => { setDateFrom(v); setPage(1); }} onTo={v => { setDateTo(v); setPage(1); }} />
             <div className="flex-1 min-h-0">
-              <Pipeline leads={leads} stages={STAGES} onSelect={setSelectedLead} />
+              <Pipeline leads={leads} stages={stages} onSelect={setSelectedLead} />
             </div>
           </div>
         )}
@@ -400,7 +413,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                   className="px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                 >
                   <option value="">All Stages</option>
-                  {STAGES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
+                  {stages.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}
                 </select>
                 <PeriodBar dateFrom={dateFrom} dateTo={dateTo} hasFilter={!!hasDateFilter}
                   onPreset={applyPreset} onFrom={v => { setDateFrom(v); setPage(1); }} onTo={v => { setDateTo(v); setPage(1); }} />
@@ -410,7 +423,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
                   <LeadCard
                     key={lead.id}
                     lead={lead}
-                    stages={STAGES}
+                    stages={stages}
                     onClick={() => setSelectedLead(lead)}
                     onCall={phone => handleCall(phone)}
                     onSms={(id, phone) => handleSms(id, phone, lead.lead_name || '')}
@@ -479,7 +492,7 @@ export default function Dashboard({ clientId, businessName, userEmail, onBack }:
         <LeadModal
           key={selectedLead.id}
           lead={selectedLead}
-          stages={STAGES}
+          stages={stages}
           onClose={() => setSelectedLead(null)}
           onStageChange={handleStageChange}
           onNotesSave={handleNotesSave}
